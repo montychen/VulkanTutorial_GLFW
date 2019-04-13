@@ -1,0 +1,58 @@
+* 下载安装 Vulkan SDK
+  1. 从lunarg下载 [[https://vulkan.lunarg.com/home/welcome]] Vulkan SDK 的 MacOS 版本， Mac/iOS下的Vulkan并非原生实现，而是通过 *MoltenVK* [[https://github.com/KhronosGroup/MoltenVK]]  作为中间层调用 Metal来实现的。
+  2. 下载Vulkan SDK后，将它解压到一个合适的位置。 Vulkan SDK 的 MacOS版，已经内置了编译好的 MoltenVK。
+  3. 然后在 ~/.bash_profile 文件中设置下面这些环境变变量。详见 [[https://vulkan.lunarg.com/doc/sdk/1.1.92.1/mac/getting_started.html]]
+  #+begin_src sh
+# 把 VULKAN_SDK 设置为SDK解压后里面 macOS 目录的地址。
+export VULKAN_SDK=/Users/monty/STUDY/vulkansdk-macos-1.1.101.0/macOS
+
+export VK_ICD_FILENAMES=$VULKAN_SDK/etc/vulkan/icd.d/MoltenVK_icd.json
+export VK_LAYER_PATH=$VULKAN_SDK/etc/vulkan/explicit_layer.d
+
+export DYLD_LIBRARY_PATH=$VULKAN_SDK/lib:$DYLD_LIBRARY_PATHH
+export PATH=$PATH:$VULKAN_SDK/bin
+  #+end_src
+  - 运行 $VULKAN_SDK/bin 目录里的命令行程序 vulkaninfo 确认配置正确
+  #+begin_src sh
+  monty$  cd $VULKAN_SDK/bin
+  monty$  vulkaninfo
+  #+end_src
+
+
+* 安装 GLFW
+  Vulkan是一个平台无关的图形API，它没有包含任何用于创建窗口的功能。为了跨平台和避免陷入Win32的窗口细节中去，我们使用 *GLFW* [[https://github.com/glfw/glfw]] 库来完成窗口相关操作，GLFW库支持Windows，Linux和MacOS。当然，还有其它一些库可以完成类似功能，比如SDL。但除了窗口相关处理，GLFW库对于Vulkan的使用还有其它一些优点。读者可以再GLFW的官方网站上免费下载到最新版本的GLFW库。
+
+  GLFW的3.2.1稳定版目前还尚未完全支持Vulkan，所以我们使用下面的代码安装glfw3包的最新版本：
+  #+begin_src sh
+  $ brew install glfw3   #/usr/local/Cellar/ 目录下会多出来一个 glfw 的文件夹，相关的文件都在这个里面。
+  #+end_src
+
+
+
+* 在 CMakeLists.txt 文件里 设置GLFW和VULKAN头文件和链接库的路径：
+  参考这里设置 [[https://zhuanlan.zhihu.com/p/45528705][CMakeLists.txt]]
+
+  #+begin_src sh
+
+# 通过$ENV{VULKAN_SDK} 引用在 ~/.bash_profile 里设置的环境变量 VULKAN_SDK
+INCLUDE_DIRECTORIES("/usr/local/include")   #brew安装头文件的目录 /usr/local/include, 包括GLFW的头文件
+INCLUDE_DIRECTORIES("$ENV{VULKAN_SDK}/include")   # VULKAN 的头文件
+
+LINK_LIBRARIES("/usr/local/lib/libglfw.3.3.dylib")  # GLFW的动态链接库。brew安装链接库的目录 /usr/local/lib
+LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.dylib")  # vulkan 的动态链接库
+LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.1.101.dylib")  #
+
+  #+end_src
+
+
+
+* 编译运行 cmake build
+  至此, 你已经完成了基本项目的构建, 可以随意修改代码, 只要运行
+
+  cd build
+
+  cmake ..  #生成Makefile
+
+  make   #编译
+
+  就可以生成可执行文件了.
