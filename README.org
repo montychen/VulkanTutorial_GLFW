@@ -28,6 +28,12 @@ export PATH=$PATH:$VULKAN_SDK/bin
   #+end_src
 
 
+* 安装 GLM 
+
+Vulkan 没有包含线性代数库，我们需要自己找一个。GLM 就是一个我们需要的线性代数库，它经常和Vulkan 和 OpenGL 一块使用。GLM 是一个只有头文件的库，我们只需要下载它的最新版，然后将它放在一个合适的位置，就可以通过包含头文件的方式使用它。
+#+begin_src sh
+brew install glm
+#+end_src
 
 * 在 CMakeLists.txt 文件里 设置GLFW和VULKAN头文件和链接库的路径：
   参考这里设置 [[https://zhuanlan.zhihu.com/p/45528705][CMakeLists.txt]]
@@ -35,7 +41,7 @@ export PATH=$PATH:$VULKAN_SDK/bin
   #+begin_src sh
 
 # 通过$ENV{VULKAN_SDK} 引用在 ~/.bash_profile 里设置的环境变量 VULKAN_SDK
-INCLUDE_DIRECTORIES("/usr/local/include")   #brew安装头文件的目录 /usr/local/include, 包括GLFW的头文件
+INCLUDE_DIRECTORIES("/usr/local/include")   #brew安装头文件的目录 /usr/local/include, 包括 GLFW 和 GLM 的头文件
 INCLUDE_DIRECTORIES("$ENV{VULKAN_SDK}/include")   # VULKAN 的头文件
 
 LINK_LIBRARIES("/usr/local/lib/libglfw.3.3.dylib")  # GLFW的动态链接库。brew安装链接库的目录 /usr/local/lib
