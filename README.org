@@ -22,9 +22,8 @@ export PATH=$PATH:$VULKAN_SDK/bin
 * 安装 GLFW
   Vulkan是一个平台无关的图形API，它没有包含任何用于创建窗口的功能。为了跨平台和避免陷入Win32的窗口细节中去，我们使用 *GLFW* [[https://github.com/glfw/glfw]] 库来完成窗口相关操作，GLFW库支持Windows，Linux和MacOS。当然，还有其它一些库可以完成类似功能，比如SDL。但除了窗口相关处理，GLFW库对于Vulkan的使用还有其它一些优点。读者可以再GLFW的官方网站上免费下载到最新版本的GLFW库。
 
-  GLFW的3.2.1稳定版目前还尚未完全支持Vulkan，所以我们使用下面的代码安装glfw3包的最新版本：
   #+begin_src sh
-  $ brew install glfw3   #/usr/local/Cellar/ 目录下会多出来一个 glfw 的文件夹，相关的文件都在这个里面。
+  $ brew install glfw   #/usr/local/Cellar/ 目录下会多出来一个 glfw 的文件夹，相关的文件都在这个里面。
   #+end_src
 
 
@@ -54,7 +53,7 @@ LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.1.101.dylib")  #
 
 * 编译运行 cmake build
   至此, 你已经完成了基本项目的构建, 可以随意修改代码, 只要运行
-
+  mkdir build   # 如果没有 build 目录，就先创建一个。
   cd build
 
   cmake ..  #生成Makefile
