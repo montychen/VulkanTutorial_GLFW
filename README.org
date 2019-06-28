@@ -1,6 +1,6 @@
-* 下载安装 Vulkan SDK
+* Mac下载安装 Vulkan SDK
   1. 从lunarg下载 [[https://vulkan.lunarg.com/home/welcome]] Vulkan SDK 的 MacOS 版本， Mac/iOS下的Vulkan并非原生实现，而是通过 *MoltenVK* [[https://github.com/KhronosGroup/MoltenVK]]  作为中间层调用 Metal来实现的。
-  2. 下载Vulkan SDK后，将它解压到一个合适的位置。 Vulkan SDK 的 MacOS版，已经内置了编译好的 MoltenVK。
+  2. 下载Vulkan SDK后，将它解压到一个合适的位置。 *Vulkan SDK 的 MacOS版，已经内置了编译好的 MoltenVK。*
   3. 然后在 ~/.bash_profile 文件中设置下面这些环境变变量。详见 [[https://vulkan.lunarg.com/doc/sdk/1.1.92.1/mac/getting_started.html]]
   #+begin_src sh
 # 把 VULKAN_SDK 设置为SDK解压后里面 macOS 目录的地址。
@@ -61,3 +61,5 @@ LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.1.101.dylib")  #
   make   #编译
 
   就可以生成可执行文件了.
+  
+* Xcode使用Vulkan SDK的开发环境配置，可以参考 *Vulkan Tutorial* 这本书中的设置 [[https://vulkan-tutorial.com/Development_environment#page_MacOS ]]
