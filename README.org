@@ -3,63 +3,71 @@
   2. 下载Vulkan SDK后，将它解压到一个合适的位置。 *Vulkan SDK 的 MacOS版，已经内置了编译好的 MoltenVK。*
   3. 然后在 ~/.bash_profile 文件中设置下面这些环境变变量。详见 [[https://vulkan.lunarg.com/doc/sdk/1.1.92.1/mac/getting_started.html]]
   #+begin_src sh
-# 把 VULKAN_SDK 设置为SDK解压后里面 macOS 目录的地址。
-export VULKAN_SDK=/Users/monty/STUDY/vulkansdk-macos-1.1.101.0/macOS
+	# 把 VULKAN_SDK 设置为SDK解压后里面 macOS 目录的地址。
+	export VULKAN_SDK=/Users/monty/STUDY/vulkansdk-macos-1.1.101.0/macOS
 
-export VK_ICD_FILENAMES=$VULKAN_SDK/etc/vulkan/icd.d/MoltenVK_icd.json
-export VK_LAYER_PATH=$VULKAN_SDK/etc/vulkan/explicit_layer.d
+	export VK_ICD_FILENAMES=$VULKAN_SDK/etc/vulkan/icd.d/MoltenVK_icd.json
+	export VK_LAYER_PATH=$VULKAN_SDK/etc/vulkan/explicit_layer.d
 
-export DYLD_LIBRARY_PATH=$VULKAN_SDK/lib:$DYLD_LIBRARY_PATHH
-export PATH=$PATH:$VULKAN_SDK/bin
+	export DYLD_LIBRARY_PATH=$VULKAN_SDK/lib:$DYLD_LIBRARY_PATHH
+	export PATH=$PATH:$VULKAN_SDK/bin
   #+end_src
   - 运行 $VULKAN_SDK/bin 目录里的命令行程序 vulkaninfo 确认配置正确
   #+begin_src sh
-  monty$  cd $VULKAN_SDK/bin
-  monty$  vulkaninfo
+	monty$  cd $VULKAN_SDK/bin
+	monty$  vulkaninfo
   #+end_src
 
 
-* 安装 GLFW
-  Vulkan是一个平台无关的图形API，它没有包含任何用于创建窗口的功能。为了跨平台和避免陷入Win32的窗口细节中去，我们使用 *GLFW* [[https://github.com/glfw/glfw]] 库来完成窗口相关操作，GLFW库支持Windows，Linux和MacOS。当然，还有其它一些库可以完成类似功能，比如SDL。但除了窗口相关处理，GLFW库对于Vulkan的使用还有其它一些优点。读者可以再GLFW的官方网站上免费下载到最新版本的GLFW库。
+** 安装 GLFW
+   Vulkan是一个平台无关的图形API，它没有包含任何用于创建窗口的功能。为了跨平台和避免陷入Win32的窗口细节中去，我们使用 *GLFW* [[https://github.com/glfw/glfw]] 库来完成窗口相关操作，GLFW库支持Windows，Linux和MacOS。当然，还有其它一些库可以完成类似功能，比如SDL。但除了窗口相关处理，GLFW库对于Vulkan的使用还有其它一些优点。读者可以再GLFW的官方网站上免费下载到最新版本的GLFW库。
 
-  #+begin_src sh
-  $ brew install glfw3   #/usr/local/Cellar/ 目录下会多出来一个 glfw 的文件夹，相关的文件都在这个里面。
-  #+end_src
-
-
-* 安装 GLM 
-
-Vulkan 没有包含线性代数库，我们需要自己找一个。GLM 就是一个我们需要的线性代数库，它经常和Vulkan 和 OpenGL 一块使用。GLM 是一个只有头文件的库，我们只需要下载它的最新版，然后将它放在一个合适的位置，就可以通过包含头文件的方式使用它。
-#+begin_src sh
-brew install glm
-#+end_src
-
-* 在 CMakeLists.txt 文件里 设置GLFW和VULKAN头文件和链接库的路径：
-  参考这里设置 [[https://zhuanlan.zhihu.com/p/45528705][CMakeLists.txt]]
-
-  #+begin_src sh
-
-# 通过$ENV{VULKAN_SDK} 引用在 ~/.bash_profile 里设置的环境变量 VULKAN_SDK
-INCLUDE_DIRECTORIES("/usr/local/include")   #brew安装头文件的目录 /usr/local/include, 包括 GLFW 和 GLM 的头文件
-INCLUDE_DIRECTORIES("$ENV{VULKAN_SDK}/include")   # VULKAN 的头文件
-
-LINK_LIBRARIES("/usr/local/lib/libglfw.3.3.dylib")  # GLFW的动态链接库。brew安装链接库的目录 /usr/local/lib
-LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.dylib")  # vulkan 的动态链接库
-LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.1.101.dylib")  #
-
-  #+end_src
+   #+begin_src sh
+	 $ brew install glfw3   #/usr/local/Cellar/ 目录下会多出来一个 glfw 的文件夹，相关的文件都在这个里面。
+   #+end_src
 
 
+** 安装 GLM
 
-* 编译运行 cmake build
-  至此, 你已经完成了基本项目的构建, 可以随意修改代码, 只要运行
-  mkdir build   # 如果没有 build 目录，就先创建一个。
-  cd build
+   Vulkan 没有包含线性代数库，我们需要自己找一个。GLM 就是一个我们需要的线性代数库，它经常和Vulkan 和 OpenGL 一块使用。GLM 是一个只有头文件的库，我们只需要下载它的最新版，然后将它放在一个合适的位置，就可以通过包含头文件的方式使用它。
+   #+begin_src sh
+	 brew install glm
+   #+end_src
 
-  cmake ..  #生成Makefile
+** 在 CMakeLists.txt 文件里 设置GLFW和VULKAN头文件和链接库的路径：
+   参考这里设置 [[https://zhuanlan.zhihu.com/p/45528705][CMakeLists.txt]]
 
-  make   #编译
+   #+begin_src sh
 
-  就可以生成可执行文件了.
-  
-* Xcode使用Vulkan SDK的开发环境配置，可以参考 *Vulkan Tutorial* 这本书中的设置 [[https://vulkan-tutorial.com/Development_environment#page_MacOS ]]
+	 # 通过$ENV{VULKAN_SDK} 引用在 ~/.bash_profile 里设置的环境变量 VULKAN_SDK
+	 INCLUDE_DIRECTORIES("/usr/local/include")   #brew安装头文件的目录 /usr/local/include, 包括 GLFW 和 GLM 的头文件
+	 INCLUDE_DIRECTORIES("$ENV{VULKAN_SDK}/include")   # VULKAN 的头文件
+
+	 LINK_LIBRARIES("/usr/local/lib/libglfw.3.3.dylib")  # GLFW的动态链接库。brew安装链接库的目录 /usr/local/lib
+	 LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.dylib")  # vulkan 的动态链接库
+	 LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.1.101.dylib")  #
+
+   #+end_src
+
+
+
+** 编译运行 cmake build
+   至此, 你已经完成了基本项目的构建, 可以随意修改代码, 只要运行
+   mkdir build   # 如果没有 build 目录，就先创建一个。
+   cd build
+
+   cmake ..  #生成Makefile
+
+   make   #编译
+
+   就可以生成可执行文件了.
+
+** Xcode使用Vulkan SDK的开发环境配置，可以参考 *Vulkan Tutorial* 这本书中的设置 [[https://vulkan-tutorial.com/Development_environment#page_MacOS ]]
+
+* Vulkan 介绍：Vulkan既可以用于图形渲染，又可用于纯粹的计算。
+
+  - 窗口 *VkSurfaceKHR* ： 后缀KHR意思是这些对象是Vulkan扩展的一部分。除非你不想显示图形(比如你只想离屏渲染)，不然你还是需要创建一个窗口来显示的。Vulkan API是完全的平台不可知论者，这就是我们需要用标准化WSI（窗口系统接口）扩展与窗口管理器交互的原因。Surface是对可渲染窗口的跨平台抽象，一般通过提供一个本地句柄的方式来实例化，例如在Windows上提供的句柄是HWND。
+
+  - 交换链 *VkSwapchainKHR* ：Vulkan中没有 *默认帧缓冲区default framebuffer* 的概念。交换链本质上是一个等待 *呈现display* 给屏幕的图像队列, 确保当前正在 *渲染绘制render* 的image(图像)与当前正在呈现到屏幕的，不是同一个，确保只有完整的image才会被呈现。交换链最初的目的是使绘制图像的最终呈现与屏幕的刷新频率同步。可以简单将交换链理解为一个队列，同步生产者：即应用程序绘制图像，和消费者：屏幕刷新的Produce-Consume关系。每次我们想绘制一帧时draw a frame，我们请求交换链提供给我们一个用于渲染的image，当这一帧完成绘制后，这个image返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。
+
+  - 有的平台允许你直接渲染到显示器，无需与窗口管理器交互，只要使用 *VK_KHR_display* 和 *VK_KHR_display_swapchain* 扩展即可。这样你就可以创建一个代表整个显示器区域的surface，用其实现自己的窗口管理器。
