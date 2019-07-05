@@ -64,25 +64,43 @@
 
 ** Xcode使用Vulkan SDK的开发环境配置，可以参考 *Vulkan Tutorial* 这本书中的设置 [[https://vulkan-tutorial.com/Development_environment#page_MacOS ]]
 
-* Vulkan 介绍：Vulkan既可以用于图形渲染，又可用于纯粹的计算。
+* Vulkan 介绍：Vulkan不仅仅用于图形渲染，还可用于纯粹的计算。
 
-** Vulkan 全局概念, 为了绘制第一个三角形，我们需要：
+** Vulkan初始化流程 ：
 
-*** 创建一个VkInstance对象
-	- VkInstance: 创建完instance后，你可以查询Vulkan支持的硬件，选择一个或多个VkPhysicalDevice用于后续操作。
-*** 选择一个图形卡（VkPhysicalDevice）
+   vkCreateInstance() → vkEnumeratePhysicalDevices() → vkCreateDevice()
+
+   vkGetPhysicalDeviceFeatures
+   vkGetPhysicalDeviceProperties
+   vkGetPhysicalDeviceMemoryProperties
+
+
+*** 创建一个VkInstance对象, 和选择物理设备（VkPhysicalDevice）
+
+	- VkInstance: 创建完instance后，你可以查询Vulkan支持的硬件VkPhysicalDevice。一个VkInstance可以有多个VkPhysicalDevice，一个VkPhysicalDevice可以有多个VkDevice。在Vulkan1.0，跨GPU的调用还未实现
+
 *** 为绘制和呈现创建一个VkDevice 和VkQueue 。
 	- 逻辑设备VkDevice：选择了正确的硬件设备后，你需要创建一个VkDevice逻辑设备，它描述了你要使用哪些VkPhysicalDeviceFeatures ，例如多视口渲染和64位浮点数。你也需要标明你想使用哪个queue families。Vulkan实施的大多数操作，例如绘制命令和内存操作，都是通过提交它们到一个 *VkQueue* ，来异步执行的。Queue是从queue家族分配的，每个queue家族里的queue都支持特定的一些操作（这些操作构成一个集合）。例如，有的queue家族支持图形操作，有的支持计算操作，有的支持内存转移操作。Queue家族的能力也可以用于选择物理设备的区分因素。可能存在完全不支持图形功能的Vulkan设备。
+
 *** 创建一个窗口，窗口surface和交换链
 	- 窗口 *VkSurfaceKHR* ： 后缀KHR意思是这些对象是Vulkan扩展的一部分。除非你不想显示图形(比如你只想离屏渲染)，不然你还是需要创建一个窗口来显示的。Vulkan API是完全的平台不可知论者，这就是我们需要用标准化WSI（窗口系统接口）扩展与窗口管理器交互的原因。Surface是对可渲染窗口的跨平台抽象，一般通过提供一个本地句柄的方式来实例化，例如在Windows上提供的句柄是HWND。
 
 	- 交换链 *VkSwapchainKHR* ：Vulkan中没有 *默认帧缓冲区default framebuffer* 的概念。交换链本质上是一个等待 *呈现display* 给屏幕的图像队列, 用来确保当前正在 *渲染绘制render* 的image(图像)与当前正在呈现到屏幕的，不是同一个，确保只有完整的image才会被呈现。交换链最初的目的是使绘制图像的最终呈现与屏幕的刷新频率同步。可以简单将交换链理解为一个队列，同步生产者：即应用程序绘制图像，和消费者：屏幕刷新的Produce-Consume关系。每次我们想绘制一帧时draw a frame，我们请求交换链提供给我们一个用于渲染的image，当这一帧完成绘制后，这个image返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。有的平台允许你直接渲染到显示器，无需与窗口管理器交互，只要使用 *VK_KHR_display* 和 *VK_KHR_display_swapchain* 扩展即可。这样你就可以创建一个代表整个显示器区域的surface，用其实现自己的窗口管理器。
-*** 将交换链的image封装进VkImageView
 
-	- VkImageView 和 VkFrameBuffer：imageView引用一个image将要被使用的特定部分，而framebuffer引用imageView ，把它当做color 、depth和stencil的目标使用。因为swapchain里可以有多个image ，所以我们先发制人:为每一个image 创建一个imageView和framebuffer ，然后在绘画阶段选择一个正确的来使用。
+*** VkImageView 和 VkFrameBuffer
+	- imageView引用一个image将要被使用的特定部分，Framebuffer其实就是一堆VkImageView，framebuffer引用imageView ，把它当做color 、depth和stencil的目标使用。因为swapchain里可以有多个image。Frame buffer帧缓冲区封装了 color buffer image和depth buffer image。其中color buffer image为从swap chain获取的image，frame buffer的创建个数需要跟swap chain的image的数量对应.
 
-*** 创建渲染pass，它标明渲染目标和用法
+*** 创建渲染通道 Render pass，它标明渲染目标和用法
+	- render layer是把不同的物体放到不同的layer层里去渲染，比如前景放到一层，背景放到一层，所以每个层里渲染出来的图像包括的物体的所有信息。比如物体的高光，颜色，反光，阴影等等都在一个层里。
+	- render passes.是指把一个物体的所有信息，分开来进行渲染，比如颜色pass、高光passes、环境光遮挡等等其他passes。为什么我们要用不同的pass来渲染呢？在源头就将这些信息独立开来，这样在合成的时候我们就可以有更多的控制空间和选择余地了。
+
+	一个VkRenderPass由多个子pass组成。在简单的场景一般只有一个子pass。子pass选择一些attachment作为颜色目标，另外一些作为深度和模版目标。如果你有多个子pass，每个子pass将有不同的集合，一些用于输入，一些用于输出。
+
 *** 创建帧缓存，它引用渲染pass
-*** 构建图形管道
+	color attachment为从swap chain获取的image，depth/stencil attachment为depth buffer的image。
+*** 构建图形管道Graphics pipeline
+
 *** 申请命令缓存，为交换链的每个image记录绘制命令
+	VkCommandBuffer并不是直接创建的，它是从VkCommandPool中分配出来的。
+
 *** 渲染一帧：请求image，提交正确的绘制命令缓存，将image返回到交换链
