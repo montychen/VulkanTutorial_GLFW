@@ -30,7 +30,7 @@ INCLUDE_DIRECTORIES("$ENV{VULKAN_SDK}/include")   # VULKAN 的头文件
 
 LINK_LIBRARIES("/usr/local/lib/libglfw.3.3.dylib")  # GLFW的动态链接库。brew安装链接库的目录 /usr/local/lib
 LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.dylib")  # vulkan 的动态链接库
-LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.1.101.dylib")  # 
+LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.1.108.dylib")  # 
 
 
 # 这段代码可以区分操作系统

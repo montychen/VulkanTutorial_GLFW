@@ -53,6 +53,7 @@
 
 ** 编译运行 cmake build
    至此, 你已经完成了基本项目的构建, 可以随意修改代码, 只要运行
+   #+begin_src sh
    mkdir build   # 如果没有 build 目录，就先创建一个。
    cd build
 
@@ -60,6 +61,7 @@
 
    make   #编译
 
+   #+end_src
    就可以生成可执行文件了.
 
 ** Xcode使用Vulkan SDK的开发环境配置，可以参考 *Vulkan Tutorial* 这本书中的设置 [[https://vulkan-tutorial.com/Development_environment#page_MacOS ]]
@@ -83,7 +85,7 @@
 	- 逻辑设备VkDevice：获取你想要的硬件设备(hardware device)后，就可以通过 VkPhysicalDeviceFeatures来描述你所需要的显卡特性，像多视图渲染( multi viewport rendering )和使用64bit的float等，然后根据这些特性创建VkDevice逻辑设备。当然，也可以告诉VkDevice你想要使用何种队列。Vulkan中的大多数操作，都是通过提交到 *VkQueue* 来异步执行的。Queue是从queue家族分配的，每个queue家族里的queue都支持特定的一些操作（这些操作构成一个集合）。例如，有的queue家族支持图形操作，有的支持计算操作，有的支持内存转移操作。Queue家族的能力也可作为选择物理设备条件。可能存在完全不支持图形功能的Vulkan设备。
 
 *** 创建一个窗口，窗口surface和交换链
-	- 窗口 *VkSurfaceKHR* ： 后缀KHR意思是这些对象是Vulkan扩展的一部分。除非你不想显示图形(比如你只想离屏渲染)，不然你还是需要创建一个窗口来显示的。Vulkan API是完全的平台不可知论者，这就是我们需要用标准化WSI（窗口系统接口）扩展与窗口管理器交互的原因。Surface是对可渲染窗口的跨平台抽象，一般通过提供一个本地窗口句柄的方式来实例化，例如在Windows上提供的句柄是HWND。
+	- 窗口 *VkSurfaceKHR* ： 后缀KHR意思是这些对象是Vulkan扩展的一部分。除非你不想显示图形(比如你只想离屏渲染)，不然你还是需要创建一个窗口来显示的。Vulkan API是完全的平台不可知论者，这就是我们需要用标准化WSI（窗口系统接口）扩展与窗口管理器交互的原因。Surface是对可渲染窗口的跨平台抽象，一般通过提供一个本地窗口句柄的方式来实例化，例如在Windows上提供的句柄是HWND。幸运的是，GLFW库可以帮助我们处理不同平台的窗口问题。
 
 	- 交换链 *VkSwapchainKHR* ：Vulkan中没有 *默认帧缓冲区default framebuffer* 的概念。交换链本质上是一个等待 *呈现display* 给屏幕的图像队列, 用来确保当前正在 *渲染绘制render* 的image与当前正在呈现到屏幕的，不是同一个, 保证image完全渲染完毕后才能进行显示十分重要。交换链最初的目的是使绘制图像的最终呈现与屏幕的刷新频率同步。可以简单将交换链理解为一个队列，同步生产者：即应用程序绘制图像，和消费者：屏幕刷新的Produce-Consume关系。每次我们想绘制一帧时draw a frame，我们请求交换链提供给我们一个用于渲染的image，当这一帧完成绘制后，这个image返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。有的平台允许你直接渲染到显示器，无需与窗口管理器交互，只要使用 *VK_KHR_display* 和 *VK_KHR_display_swapchain* 扩展即可。这样你就可以创建一个代表整个显示器区域的surface，用其实现自己的窗口管理器。
 
