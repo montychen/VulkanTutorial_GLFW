@@ -77,30 +77,36 @@
 
 *** 创建一个VkInstance对象, 和选择物理设备（VkPhysicalDevice）
 
-	- VkInstance: 创建完instance后，你可以查询Vulkan支持的硬件VkPhysicalDevice。一个VkInstance可以有多个VkPhysicalDevice，一个VkPhysicalDevice可以有多个VkDevice。在Vulkan1.0，跨GPU的调用还未实现
+	- VkInstance: 创建完instance后，你可以获取支持Vulkan的可用硬件，然后从中选取一个或多个物理设备VkPhysicalDevice来使用。每个物理设备，你都可以获取它的属性vkGetPhysicalDeviceProperties，和特性vkGetPhysicalDeviceFeatures。一个VkInstance可以有多个VkPhysicalDevice，一个VkPhysicalDevice可以有多个逻辑设备VkDevice。目前跨GPU的调用还未实现。
 
-*** 为绘制和呈现创建一个VkDevice 和VkQueue 。
-	- 逻辑设备VkDevice：选择了正确的硬件设备后，你需要创建一个VkDevice逻辑设备，它描述了你要使用哪些VkPhysicalDeviceFeatures ，例如多视口渲染和64位浮点数。你也需要标明你想使用哪个queue families。Vulkan实施的大多数操作，例如绘制命令和内存操作，都是通过提交它们到一个 *VkQueue* ，来异步执行的。Queue是从queue家族分配的，每个queue家族里的queue都支持特定的一些操作（这些操作构成一个集合）。例如，有的queue家族支持图形操作，有的支持计算操作，有的支持内存转移操作。Queue家族的能力也可以用于选择物理设备的区分因素。可能存在完全不支持图形功能的Vulkan设备。
+*** 逻辑设备VkDevice 和 VkQueue 。
+	- 逻辑设备VkDevice：获取你想要的硬件设备(hardware device)后，就可以通过 VkPhysicalDeviceFeatures来描述你所需要的显卡特性，像多视图渲染( multi viewport rendering )和使用64bit的float等，然后根据这些特性创建VkDevice逻辑设备。当然，也可以告诉VkDevice你想要使用何种队列。Vulkan中的大多数操作，都是通过提交到 *VkQueue* 来异步执行的。Queue是从queue家族分配的，每个queue家族里的queue都支持特定的一些操作（这些操作构成一个集合）。例如，有的queue家族支持图形操作，有的支持计算操作，有的支持内存转移操作。Queue家族的能力也可作为选择物理设备条件。可能存在完全不支持图形功能的Vulkan设备。
 
 *** 创建一个窗口，窗口surface和交换链
-	- 窗口 *VkSurfaceKHR* ： 后缀KHR意思是这些对象是Vulkan扩展的一部分。除非你不想显示图形(比如你只想离屏渲染)，不然你还是需要创建一个窗口来显示的。Vulkan API是完全的平台不可知论者，这就是我们需要用标准化WSI（窗口系统接口）扩展与窗口管理器交互的原因。Surface是对可渲染窗口的跨平台抽象，一般通过提供一个本地句柄的方式来实例化，例如在Windows上提供的句柄是HWND。
+	- 窗口 *VkSurfaceKHR* ： 后缀KHR意思是这些对象是Vulkan扩展的一部分。除非你不想显示图形(比如你只想离屏渲染)，不然你还是需要创建一个窗口来显示的。Vulkan API是完全的平台不可知论者，这就是我们需要用标准化WSI（窗口系统接口）扩展与窗口管理器交互的原因。Surface是对可渲染窗口的跨平台抽象，一般通过提供一个本地窗口句柄的方式来实例化，例如在Windows上提供的句柄是HWND。
 
-	- 交换链 *VkSwapchainKHR* ：Vulkan中没有 *默认帧缓冲区default framebuffer* 的概念。交换链本质上是一个等待 *呈现display* 给屏幕的图像队列, 用来确保当前正在 *渲染绘制render* 的image(图像)与当前正在呈现到屏幕的，不是同一个，确保只有完整的image才会被呈现。交换链最初的目的是使绘制图像的最终呈现与屏幕的刷新频率同步。可以简单将交换链理解为一个队列，同步生产者：即应用程序绘制图像，和消费者：屏幕刷新的Produce-Consume关系。每次我们想绘制一帧时draw a frame，我们请求交换链提供给我们一个用于渲染的image，当这一帧完成绘制后，这个image返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。有的平台允许你直接渲染到显示器，无需与窗口管理器交互，只要使用 *VK_KHR_display* 和 *VK_KHR_display_swapchain* 扩展即可。这样你就可以创建一个代表整个显示器区域的surface，用其实现自己的窗口管理器。
+	- 交换链 *VkSwapchainKHR* ：Vulkan中没有 *默认帧缓冲区default framebuffer* 的概念。交换链本质上是一个等待 *呈现display* 给屏幕的图像队列, 用来确保当前正在 *渲染绘制render* 的image与当前正在呈现到屏幕的，不是同一个, 保证image完全渲染完毕后才能进行显示十分重要。交换链最初的目的是使绘制图像的最终呈现与屏幕的刷新频率同步。可以简单将交换链理解为一个队列，同步生产者：即应用程序绘制图像，和消费者：屏幕刷新的Produce-Consume关系。每次我们想绘制一帧时draw a frame，我们请求交换链提供给我们一个用于渲染的image，当这一帧完成绘制后，这个image返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。有的平台允许你直接渲染到显示器，无需与窗口管理器交互，只要使用 *VK_KHR_display* 和 *VK_KHR_display_swapchain* 扩展即可。这样你就可以创建一个代表整个显示器区域的surface，用其实现自己的窗口管理器。
 
 *** VkImageView 和 VkFrameBuffer
-	- imageView引用一个image将要被使用的特定部分，Framebuffer其实就是一堆VkImageView，framebuffer引用imageView ，把它当做color 、depth和stencil的目标使用。因为swapchain里可以有多个image。Frame buffer帧缓冲区封装了 color buffer image和depth buffer image。其中color buffer image为从swap chain获取的image，frame buffer的创建个数需要跟swap chain的image的数量对应.
+	- imageView引用一个image将要被使用的特定部分，Framebuffer其实就是一堆VkImageView，framebuffer引用imageView ，把它当做color 、depth和stencil的目标使用。因为swapchain里可以有多个image。
+	- Frame buffer帧缓冲区封装了 color buffer image和depth buffer image。其中color buffer image为从swap chain获取的image，frame buffer的创建个数需要跟swap chain的image的数量对应.
 
 *** 创建渲染通道 Render pass，它标明渲染目标和用法
 	- render layer是把不同的物体放到不同的layer层里去渲染，比如前景放到一层，背景放到一层，所以每个层里渲染出来的图像包括的物体的所有信息。比如物体的高光，颜色，反光，阴影等等都在一个层里。
 	- render passes.是指把一个物体的所有信息，分开来进行渲染，比如颜色pass、高光passes、环境光遮挡等等其他passes。为什么我们要用不同的pass来渲染呢？在源头就将这些信息独立开来，这样在合成的时候我们就可以有更多的控制空间和选择余地了。
 
-	一个VkRenderPass由多个子pass组成。在简单的场景一般只有一个子pass。子pass选择一些attachment作为颜色目标，另外一些作为深度和模版目标。如果你有多个子pass，每个子pass将有不同的集合，一些用于输入，一些用于输出。
+	- Render pass描述了在渲染阶段要使用的image类型、如何使用以及如何处理image的内容。请注意，Render pass只是描述要使用的image类型，而framebuffer( 通过绑定image )才是要使用的image实体。
+	- VkRenderPass由多个子pass组成。在简单的场景一般只有一个子pass。子pass选择一些attachment作为颜色目标，另外一些作为深度和模版目标。如果你有多个子pass，每个子pass将有不同的集合，一些用于输入，一些用于输出。
 
-*** 创建帧缓存，它引用渲染pass
+*** 创建帧缓存，它引用渲染通道
 	color attachment为从swap chain获取的image，depth/stencil attachment为depth buffer的image。
-*** 构建图形管道Graphics pipeline
+
+*** 构建图形管线Graphics pipeline
+	- Graphics Pipeline通过创建VkPipeline对象来建立。它描述了一些显卡 *不可编程部分* 的可配置状态(configurable state )，比如viewport的大小和depth buffer操作等，以及用 *VkShaderModule表示的可编程部分* 。VkShaderModule对象用着色器的字节码来创建。驱动需要知道哪些渲染目标将在pipeline中使用，而这些目标就是我们在Render pass中定义的image。
+	
+	- Vulkan和现存的其他图形API最显著地区别就是：几乎所有不可编程部分的配置都要在pipeline创建前提前完成。这就意味着如果你想换一个着色器(shader)或者仅仅改变一些顶点的布局(vertex layout) ,那么你必须重新创建pipeline 。这也意味着你必须提前创建很多pipeline，来应对渲染过程中不同组合的配置。只有很少的一些配置你可以动态改变，比如viewport 的大小和celar 的颜色等。Pipeline中所有的配置状态你必须显示的进行定义，比如，颜色混合就没有为你提供默认的配置。
 
 *** 申请命令缓存，为交换链的每个image记录绘制命令
-	VkCommandBuffer并不是直接创建的，它是从VkCommandPool中分配出来的。
+	Vulkan中的命令必须提交到对应的队列queue才能执行。这些命令首先要记录到VkCommandBuffer中，然后才能提交的到队列。VkCommandBuffer并不是直接创建的，它是从VkCommandPool中分配出来的。
 
 *** 渲染一帧：请求image，提交正确的绘制命令缓存，将image返回到交换链
