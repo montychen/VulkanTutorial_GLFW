@@ -54,12 +54,12 @@
 ** 编译运行 cmake build
    至此, 你已经完成了基本项目的构建, 可以随意修改代码, 只要运行
    #+begin_src sh
-   mkdir build   # 如果没有 build 目录，就先创建一个。
-   cd build
+	 mkdir build   # 如果没有 build 目录，就先创建一个。
+	 cd build
 
-   cmake ..  #生成Makefile
+	 cmake ..  #生成Makefile
 
-   make   #编译
+	 make   #编译
 
    #+end_src
    就可以生成可执行文件了.
@@ -71,6 +71,10 @@
 ** Vulkan初始化流程 ：
 
    vkCreateInstance() → vkEnumeratePhysicalDevices() → vkCreateDevice()
+
+   vkEnumerateInstanceExtensionProperties()  // 为了在创建instance前检索支持的扩展 VkExtensionProperties
+   vkCreateInstance() -> VkInstanceCreateInfo +  VkApplicationInfo
+   vkEnumerateInstanceLayerProperties 函数列出所有可以用的层
 
    vkGetPhysicalDeviceFeatures
    vkGetPhysicalDeviceProperties
@@ -105,10 +109,11 @@
 
 *** 构建图形管线Graphics pipeline
 	- Graphics Pipeline通过创建VkPipeline对象来建立。它描述了一些显卡 *不可编程部分* 的可配置状态(configurable state )，比如viewport的大小和depth buffer操作等，以及用 *VkShaderModule表示的可编程部分* 。VkShaderModule对象用着色器的字节码来创建。驱动需要知道哪些渲染目标将在pipeline中使用，而这些目标就是我们在Render pass中定义的image。
-	
+
 	- Vulkan和现存的其他图形API最显著地区别就是：几乎所有不可编程部分的配置都要在pipeline创建前提前完成。这就意味着如果你想换一个着色器(shader)或者仅仅改变一些顶点的布局(vertex layout) ,那么你必须重新创建pipeline 。这也意味着你必须提前创建很多pipeline，来应对渲染过程中不同组合的配置。只有很少的一些配置你可以动态改变，比如viewport 的大小和celar 的颜色等。Pipeline中所有的配置状态你必须显示的进行定义，比如，颜色混合就没有为你提供默认的配置。
 
 *** 申请命令缓存，为交换链的每个image记录绘制命令
 	Vulkan中的命令必须提交到对应的队列queue才能执行。这些命令首先要记录到VkCommandBuffer中，然后才能提交的到队列。VkCommandBuffer并不是直接创建的，它是从VkCommandPool中分配出来的。
 
 *** 渲染一帧：请求image，提交正确的绘制命令缓存，将image返回到交换链
+	
