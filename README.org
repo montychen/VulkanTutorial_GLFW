@@ -70,12 +70,19 @@
 
 ** Vulkan初始化流程 ：
 
+
+   1) vkCreateInstance()： VkInstanceCreateInfo +  VkApplicationInfo  创建实例
+   2) vkCreateDebugUtilsMessengerEXT：启用VK_LAYER_KHRONOS_validation验证层后，定义一个用来接收消息的回调函数debugCallback。为了接收消息，我们还要启用VK_EXT_debug_utils 扩展。
+   3) glfwCreateWindowSurface：窗口surface需要在instance被创建后立即被创建，因为它实际上会影响物理设备的选择。
+   4) vkEnumeratePhysicalDevices() -> vkGetPhysicalDeviceQueueFamilyProperties() 根据合适的队列簇，选择物理设备
+   5) vkCreateDevice(): VkDeviceCreateInfo + VkDeviceQueueCreateInfo  创建逻辑设备、队列随着逻辑设备的创建而自动创建。
+
+
+
    vkCreateInstance() → vkEnumeratePhysicalDevices() → vkCreateDevice()
-
    vkEnumerateInstanceExtensionProperties()  // 为了在创建instance前检索支持的扩展 VkExtensionProperties
-   vkCreateInstance() -> VkInstanceCreateInfo +  VkApplicationInfo
-   vkEnumerateInstanceLayerProperties 函数列出所有可以用的层
 
+   vkEnumerateInstanceLayerProperties 函数列出所有可以用的层
    vkGetPhysicalDeviceFeatures
    vkGetPhysicalDeviceProperties
    vkGetPhysicalDeviceMemoryProperties
@@ -116,4 +123,3 @@
 	Vulkan中的命令必须提交到对应的队列queue才能执行。这些命令首先要记录到VkCommandBuffer中，然后才能提交的到队列。VkCommandBuffer并不是直接创建的，它是从VkCommandPool中分配出来的。
 
 *** 渲染一帧：请求image，提交正确的绘制命令缓存，将image返回到交换链
-	
