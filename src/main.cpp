@@ -7,6 +7,8 @@
 #include <vector>
 #include <cstring>
 #include <cstdlib>
+#include <optional>
+#include <set>
 
 const int WIDTH = 800;
 const int HEIGHT = 600;
@@ -41,6 +43,18 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 	}
 }
 
+
+
+struct QueueFamilyIndices {
+    std::optional<uint32_t> graphicsFamily; // 有的设备支持绘制命令 drawing commands， 不代表就一定支持呈现，也就是将image呈现到我们创建的surface窗口上。
+    std::optional<uint32_t> presentFamily;	// 所以需要把支持呈现presentation作为选取设备时的一个条件。presentation是个队列相关的特性，这个问题实际上是要找到一个队列家族，其支持呈现到我们创建的surface。
+
+    bool isComplete() {
+        return graphicsFamily.has_value() && presentFamily.has_value();	// 确保同时满足绘制和呈现这两个条件。 这里没有确保她们是同一个队列。
+    }
+};
+
+
 class HelloTriangleApplication {
 public:
 	void run() {
@@ -52,10 +66,17 @@ public:
 
 private:
 	GLFWwindow* window;
+
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
+	VkSurfaceKHR surface;
+
 
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+	VkDevice device;			// 在选择了要用的物理设备后，我们需要设置一个逻辑设备，用以与其交互。
+
+	VkQueue graphicsQueue;
+	VkQueue presentQueue;
 
 	void initWindow(){
 		glfwInit();
@@ -70,7 +91,9 @@ private:
 	void initVulkan() {
 		createInstance();
 		setupDebugMessenger();
+		createSurface();		// 窗口surface需要在instance被创建后立即被创建，因为它实际上会影响物理设备的选择。
 		pickPhysicalDevice();
+		createLogicalDevice();
 	}
 
 	void mainLoop() {
@@ -81,10 +104,15 @@ private:
 	}
 
 	void cleanup() {
+		vkDestroyDevice(device, nullptr);
+
 		if (enableValidationLayers) {
 			DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 		}
+
+		vkDestroySurfaceKHR(instance, surface, nullptr);
 		vkDestroyInstance(instance, nullptr);
+
 		glfwDestroyWindow(window);  // 一旦窗口被关闭，我们需要销毁资源，关闭GLFW.
 
 		glfwTerminate();
@@ -151,61 +179,126 @@ private:
 	}
 
 
+	// 尽管VkSurfaceKHR 对象及其用法是平台无关的，它的创建过程却不是平台无关的，因为它依赖窗口系统的细节。例如，在Windows上它需要HWND 和HMODULE 。
+	// 因此有一个平台相关的扩展，在Windows上是VK_KHR_win32_surface ，它也被自动包含在由glfwGetRequiredInstanceExtensions得到的列表中了。
+	// GLFW实际上有glfwCreateWindowSurface ，它处理了平台相关的差异。
+	void createSurface() {
+		if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create window surface!");
+		}
+	}
+
+
 	// 通过VkInstance 初始化了Vulkan库之后，需要在系统中查找和选择一个支持我们需要的特性的图形卡。实际上可以选择任意多个图形卡，同步地使用它们，这里我们只使用第一个满足我们需要的图形卡。
-    void pickPhysicalDevice() {
-        uint32_t deviceCount = 0;
-        vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr); // 枚举图形卡，先获取数量。
+	void pickPhysicalDevice() {
+		uint32_t deviceCount = 0;
+		vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr); // 枚举图形卡，先获取数量。
 
-        if (deviceCount == 0) {	// 如果支持Vulkan的设备数量为0，那么就没有必要继续了。
-            throw std::runtime_error("failed to find GPUs with Vulkan support!");
+		if (deviceCount == 0) {	// 如果支持Vulkan的设备数量为0，那么就没有必要继续了。
+			throw std::runtime_error("failed to find GPUs with Vulkan support!");
+		}
+
+		std::vector<VkPhysicalDevice> devices(deviceCount); // 申请一个数组来记录所有的VkPhysicalDevice 句柄。
+		vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+
+		for (const auto& device : devices) {
+			if (isDeviceSuitable(device)) {
+				physicalDevice = device; // 这里我们只使用第一个满足我们需要的图形卡。
+				break;
+			}
+		}
+
+		if (physicalDevice == VK_NULL_HANDLE) {
+			throw std::runtime_error("failed to find a suitable GPU!");
+		}
+	}
+
+
+	void createLogicalDevice() {
+		QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+        std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+
+		float queuePriority = 1.0f; // 队列赋予优先级（0.0到1.0的浮点数）
+		for (uint32_t queueFamily : uniqueQueueFamilies) {
+            VkDeviceQueueCreateInfo queueCreateInfo = {};
+            queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queueCreateInfo.queueFamilyIndex = queueFamily;
+            queueCreateInfo.queueCount = 1;
+            queueCreateInfo.pQueuePriorities = &queuePriority;
+            queueCreateInfos.push_back(queueCreateInfo);
         }
 
-        std::vector<VkPhysicalDevice> devices(deviceCount); // 申请一个数组来记录所有的VkPhysicalDevice 句柄。
-        vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+        VkPhysicalDeviceFeatures deviceFeatures = {};
 
-        for (const auto& device : devices) {
-            if (isDeviceSuitable(device)) {
-                physicalDevice = device; // 这里我们只使用第一个满足我们需要的图形卡。
-                break;
-            }
-        }
+        VkDeviceCreateInfo createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
-        if (physicalDevice == VK_NULL_HANDLE) {
-            throw std::runtime_error("failed to find a suitable GPU!");
-        }
-    }
+        createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
+        createInfo.pQueueCreateInfos = queueCreateInfos.data();
+
+        createInfo.pEnabledFeatures = &deviceFeatures;
+
+        createInfo.enabledExtensionCount = 0;
+
+		if (enableValidationLayers) { // 基于逻辑设备的验证层已经废弃，这里只是为了兼容性才进行设置，其实完全可以不设置，直接把0赋给enabledLayerCount就可以了。
+			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+			createInfo.ppEnabledLayerNames = validationLayers.data();
+		} else {
+			createInfo.enabledLayerCount = 0;
+		}
+
+		if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) { // 队列随着逻辑设备的创建而自动创建
+			throw std::runtime_error("failed to create logical device!");
+		}
+
+		vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue); // 用vkGetDeviceQueue函数从队列家族获取队列句柄，并保存在graphicsQueue。因为我们只创建一个队列，用索引0即可。
+		vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
+	}
+
 
 	// 检查设备，是否满足我们的需要，因为不是所有的图形卡都一样。
-    bool isDeviceSuitable(VkPhysicalDevice device) {
-        QueueFamilyIndices indices = findQueueFamilies(device);
+	bool isDeviceSuitable(VkPhysicalDevice device) {
+		QueueFamilyIndices indices = findQueueFamilies(device); // 任何操作，从绘画到上传纹理，都要将命令提交到队列。有不同的队列，这里是选择我们需要的队列。
 
-        return indices.isComplete();
-    }
+		return indices.isComplete();
+	}
 
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
-        QueueFamilyIndices indices;
+	// vkGetPhysicalDeviceProperties： 获取物理设备的基本属性，如名字、类型和支持的Vulkan版本
+	// vkGetPhysicalDeviceFeatures：获取物理设备的可选特性，如：纹理压缩、64位浮点数和多视口渲染
+	// vkGetPhysicalDeviceQueueFamilyProperties: 获取物理设备的 队列属性
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
+		QueueFamilyIndices indices;
 
-        uint32_t queueFamilyCount = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+		uint32_t queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
-        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
-        int i = 0;
-        for (const auto& queueFamily : queueFamilies) {
-            if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-                indices.graphicsFamily = i;
-            }
+		int i = 0;
+		for (const auto& queueFamily : queueFamilies) {
+			if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) { // 现在我们将只查找支持图形命令的队列
+				indices.graphicsFamily = i;
+			}
 
-            if (indices.isComplete()) {
-                break;
-            }
+			VkBool32 presentSupport = false;
+			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport); // 查询能够呈现到窗口surface的队列家族，该函数以物理设备，队列家族索引和surface为参数。
 
-            i++;
-        }
+			if (queueFamily.queueCount > 0 && presentSupport) {
+				indices.presentFamily = i; // 支持绘制和呈现的队列不一定是同一个。 可以考虑添加一段逻辑来显式地选择一个物理设备，其在同一队列中同时支持绘制和presentation，以获得更好的性能。
+			}
 
-        return indices;
-    }
+			if (indices.isComplete()) {
+				break;
+			}
+
+			i++;
+		}
+
+		return indices;
+	}
 
 
 
