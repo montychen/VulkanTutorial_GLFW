@@ -74,8 +74,11 @@
    1) vkCreateInstance()： VkInstanceCreateInfo +  VkApplicationInfo  创建实例
    2) vkCreateDebugUtilsMessengerEXT：启用VK_LAYER_KHRONOS_validation验证层后，定义一个用来接收消息的回调函数debugCallback。为了接收消息，我们还要启用VK_EXT_debug_utils 扩展。
    3) glfwCreateWindowSurface：窗口surface需要在instance被创建后立即被创建，因为它实际上会影响物理设备的选择。
-   4) vkEnumeratePhysicalDevices() -> vkGetPhysicalDeviceQueueFamilyProperties() 根据合适的队列簇，选择物理设备
+   4) vkEnumeratePhysicalDevices() -> vkGetPhysicalDeviceQueueFamilyProperties() 根据合适的队列簇，选择物理设备, 为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
    5) vkCreateDevice(): VkDeviceCreateInfo + VkDeviceQueueCreateInfo  创建逻辑设备、队列随着逻辑设备的创建而自动创建。
+   6) vkCreateSwapchainKHR()
+
+
 
 
 
