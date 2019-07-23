@@ -2,7 +2,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8) # cmake最低版本要求
 
 PROJECT(study_opengl)    # 工程名 CppTemplate
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11") # 添加c++11标准支持
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17") # 添加c++17标准支持
 
 SET(CMAKE_C_COMPILER "/usr/bin/gcc") # 默认c编译器
 SET(CMAKE_CXX_COMPILER "/usr/bin/g++") # 默认c++编译器
