@@ -1,128 +1,131 @@
-* Mac下载安装 Vulkan SDK
-  1. 从lunarg下载 [[https://vulkan.lunarg.com/home/welcome]] Vulkan SDK 的 MacOS 版本， Mac/iOS下的Vulkan并非原生实现，而是通过 *MoltenVK* [[https://github.com/KhronosGroup/MoltenVK]]  作为中间层调用 Metal来实现的。
-  2. 下载Vulkan SDK后，将它解压到一个合适的位置。 *Vulkan SDK 的 MacOS版，已经内置了编译好的 MoltenVK。*
-  3. 然后在 ~/.bash_profile 文件中设置下面这些环境变变量。详见 [[https://vulkan.lunarg.com/doc/sdk/1.1.92.1/mac/getting_started.html]]
-  #+begin_src sh
-	# 把 VULKAN_SDK 设置为SDK解压后里面 macOS 目录的地址。
-	export VULKAN_SDK=/Users/monty/STUDY/vulkansdk-macos-1.1.101.0/macOS
+* Mac 下载安装 Vulkan SDK
+   1. 从 lunarg 下载 [[https://vulkan.lunarg.com/home/welcome]] Vulkan SDK 的 MacOS 版本， Mac/iOS 下的 Vulkan 并非原生实现，而是通过 *MoltenVK* [[https://github.com/KhronosGroup/MoltenVK]]  作为中间层调用 Metal 来实现的。
+   2. 下载 Vulkan SDK 后，将它解压到一个合适的位置。 *Vulkan SDK 的 MacOS 版，已经内置了编译好的 MoltenVK。*
+   3. 然后在 ~/.bash_profile 文件中设置下面这些环境变变量。详见 [[https://vulkan.lunarg.com/doc/sdk/1.1.92.1/mac/getting_started.html]]
+      #+begin_src sh
+# 把 VULKAN_SDK 设置为 SDK 解压后里面 macOS 目录的地址。
+export VULKAN_SDK=/Users/monty/STUDY/vulkansdk-macos-1.1.101.0/macOS
 
-	export VK_ICD_FILENAMES=$VULKAN_SDK/etc/vulkan/icd.d/MoltenVK_icd.json
-	export VK_LAYER_PATH=$VULKAN_SDK/etc/vulkan/explicit_layer.d
+export VK_ICD_FILENAMES=$VULKAN_SDK/etc/vulkan/icd.d/MoltenVK_icd.json
+export VK_LAYER_PATH=$VULKAN_SDK/etc/vulkan/explicit_layer.d
 
-	export DYLD_LIBRARY_PATH=$VULKAN_SDK/lib:$DYLD_LIBRARY_PATHH
-	export PATH=$PATH:$VULKAN_SDK/bin
-  #+end_src
-  - 运行 $VULKAN_SDK/bin 目录里的命令行程序 vulkaninfo 确认配置正确
-  #+begin_src sh
-	monty$  cd $VULKAN_SDK/bin
-	monty$  vulkaninfo
-  #+end_src
+export DYLD_LIBRARY_PATH=$VULKAN_SDK/lib:$DYLD_LIBRARY_PATHH
+export PATH=$PATH:$VULKAN_SDK/bin
+      #+end_src
+      - 运行 $VULKAN_SDK/bin 目录里的命令行程序 vulkaninfo 确认配置正确
+      #+begin_src sh
+monty$  cd $VULKAN_SDK/bin
+monty$  vulkaninfo
+      #+end_src
 
 
 ** 安装 GLFW
-   Vulkan是一个平台无关的图形API，它没有包含任何用于创建窗口的功能。为了跨平台和避免陷入Win32的窗口细节中去，我们使用 *GLFW* [[https://github.com/glfw/glfw]] 库来完成窗口相关操作，GLFW库支持Windows，Linux和MacOS。当然，还有其它一些库可以完成类似功能，比如SDL。但除了窗口相关处理，GLFW库对于Vulkan的使用还有其它一些优点。读者可以再GLFW的官方网站上免费下载到最新版本的GLFW库。
+Vulkan 是一个平台无关的图形 API，它没有包含任何用于创建窗口的功能。为了跨平台和避免陷入 Win32 的窗口细节中去，我们使用 *GLFW* [[https://github.com/glfw/glfw]] 库来完成窗口相关操作，GLFW 库支持 Windows，Linux 和 MacOS。当然，还有其它一些库可以完成类似功能，比如 SDL。但除了窗口相关处理，GLFW 库对于 Vulkan 的使用还有其它一些优点。读者可以再 GLFW 的官方网站上免费下载到最新版本的 GLFW 库。
 
-   #+begin_src sh
-	 $ brew install glfw3   #/usr/local/Cellar/ 目录下会多出来一个 glfw 的文件夹，相关的文件都在这个里面。
-   #+end_src
+#+begin_src sh
+$ brew install glfw3   #/usr/local/Cellar/ 目录下会多出来一个 glfw 的文件夹，相关的文件都在这个里面。
+#+end_src
 
 
 ** 安装 GLM
 
-   Vulkan 没有包含线性代数库，我们需要自己找一个。GLM 就是一个我们需要的线性代数库，它经常和Vulkan 和 OpenGL 一块使用。GLM 是一个只有头文件的库，我们只需要下载它的最新版，然后将它放在一个合适的位置，就可以通过包含头文件的方式使用它。
-   #+begin_src sh
-	 brew install glm
-   #+end_src
+Vulkan 没有包含线性代数库，我们需要自己找一个。GLM 就是一个我们需要的线性代数库，它经常和 Vulkan 和 OpenGL 一块使用。GLM 是一个只有头文件的库，我们只需要下载它的最新版，然后将它放在一个合适的位置，就可以通过包含头文件的方式使用它。
+#+begin_src sh
+brew install glm
+#+end_src
 
-** 在 CMakeLists.txt 文件里 设置GLFW和VULKAN头文件和链接库的路径：
-   参考这里设置 [[https://zhuanlan.zhihu.com/p/45528705][CMakeLists.txt]]
+** 在 CMakeLists.txt 文件里 设置 GLFW 和 VULKAN 头文件和链接库的路径：
+参考这里设置 [[https://zhuanlan.zhihu.com/p/45528705][CMakeLists.txt]]
 
-   #+begin_src sh
+#+begin_src sh
 
-	 # 通过$ENV{VULKAN_SDK} 引用在 ~/.bash_profile 里设置的环境变量 VULKAN_SDK
-	 INCLUDE_DIRECTORIES("/usr/local/include")   #brew安装头文件的目录 /usr/local/include, 包括 GLFW 和 GLM 的头文件
-	 INCLUDE_DIRECTORIES("$ENV{VULKAN_SDK}/include")   # VULKAN 的头文件
+# 通过$ENV{VULKAN_SDK} 引用在 ~/.bash_profile 里设置的环境变量 VULKAN_SDK
+INCLUDE_DIRECTORIES("/usr/local/include")   #brew 安装头文件的目录 /usr/local/include, 包括 GLFW 和 GLM 的头文件
+INCLUDE_DIRECTORIES("$ENV{VULKAN_SDK}/include")   # VULKAN 的头文件
 
-	 LINK_LIBRARIES("/usr/local/lib/libglfw.3.3.dylib")  # GLFW的动态链接库。brew安装链接库的目录 /usr/local/lib
-	 LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.dylib")  # vulkan 的动态链接库
-	 LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.1.101.dylib")  #
+LINK_LIBRARIES("/usr/local/lib/libglfw.3.3.dylib")  # GLFW 的动态链接库。brew 安装链接库的目录 /usr/local/lib
+LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.dylib")  # vulkan 的动态链接库
+LINK_LIBRARIES("$ENV{VULKAN_SDK}/lib/libvulkan.1.1.101.dylib")  #
 
-   #+end_src
+#+end_src
 
 
 
 ** 编译运行 cmake build
-   至此, 你已经完成了基本项目的构建, 可以随意修改代码, 只要运行
-   #+begin_src sh
-	 mkdir build   # 如果没有 build 目录，就先创建一个。
-	 cd build
+至此, 你已经完成了基本项目的构建, 可以随意修改代码, 只要运行
+#+begin_src sh
+mkdir build   # 如果没有 build 目录，就先创建一个。
+cd build
 
-	 cmake ..  #生成Makefile
+cmake ..  #生成 Makefile
 
-	 make   #编译
+make   #编译
 
-   #+end_src
-   就可以生成可执行文件了.
+#+end_src
+就可以生成可执行文件了.
 
-** Xcode使用Vulkan SDK的开发环境配置，可以参考 *Vulkan Tutorial* 这本书中的设置 [[https://vulkan-tutorial.com/Development_environment#page_MacOS ]]
+** Xcode 使用 Vulkan SDK 的开发环境配置，可以参考 *Vulkan Tutorial* 这本书中的设置 [[https://vulkan-tutorial.com/Development_environment#page_MacOS ]]
 
-* Vulkan 介绍：Vulkan不仅仅用于图形渲染，还可用于纯粹的计算。
+* Vulkan 介绍：Vulkan 不仅仅用于图形渲染，还可用于纯粹的计算。
 
-** Vulkan初始化流程 ：
-
-
-   1) vkCreateInstance()： VkInstanceCreateInfo +  VkApplicationInfo  创建实例
-   2) vkCreateDebugUtilsMessengerEXT：启用VK_LAYER_KHRONOS_validation验证层后，定义一个用来接收消息的回调函数debugCallback。为了接收消息，我们还要启用VK_EXT_debug_utils 扩展。
-   3) glfwCreateWindowSurface：窗口surface需要在instance被创建后立即被创建，因为它实际上会影响物理设备的选择。
-   4) vkEnumeratePhysicalDevices() -> vkGetPhysicalDeviceQueueFamilyProperties() 根据合适的队列簇，选择物理设备, 为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
-   5) vkCreateDevice(): VkDeviceCreateInfo + VkDeviceQueueCreateInfo  创建逻辑设备、队列随着逻辑设备的创建而自动创建。
-   6) vkCreateSwapchainKHR()
+** Vulkan 初始化流程 ：
 
 
+1) vkCreateInstance()： VkInstanceCreateInfo +  VkApplicationInfo  创建实例
+2) vkCreateDebugUtilsMessengerEXT：启用 VK_LAYER_KHRONOS_validation 验证层后，定义一个用来接收消息的回调函数 debugCallback。为了接收消息，我们还要启用 VK_EXT_debug_utils 扩展。
+3) glfwCreateWindowSurface：窗口 surface 需要在 instance 被创建后立即被创建，因为它实际上会影响物理设备的选择。
+4) vkEnumeratePhysicalDevices() -> vkGetPhysicalDeviceQueueFamilyProperties() 根据合适的队列簇，选择物理设备, 为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
+5) vkCreateDevice(): VkDeviceCreateInfo + VkDeviceQueueCreateInfo  创建逻辑设备、队列随着逻辑设备的创建而自动创建。
+6) vkCreateSwapchainKHR()
+7) vkCreateImageView(): 为了使用 VkImage,不管是在 SwapChain 还是在 Pipeline 中，都必须先创建 VkImageView, 它是 image 的一个 view，描述了我们如何访问 image、访问 image 的哪一部分等。
+8) : vkCreateShaderModule() 在 Vulkan 中，图形管线几乎完全不允许进行动态设置，如果我们 想使用其它着色器，绑定其它帧缓冲，以及改变混合函数，都需要重新创 建管线。这就迫使我们必须提前创建所有我们需要使用的图形管线，虽然 这样看起来不太方便，但这给驱动程序带来了很大的优化空间。
+
+   [[file://vulkan_pipeline.png]]
 
 
 
-   vkCreateInstance() → vkEnumeratePhysicalDevices() → vkCreateDevice()
-   vkEnumerateInstanceExtensionProperties()  // 为了在创建instance前检索支持的扩展 VkExtensionProperties
 
-   vkEnumerateInstanceLayerProperties 函数列出所有可以用的层
-   vkGetPhysicalDeviceFeatures
-   vkGetPhysicalDeviceProperties
-   vkGetPhysicalDeviceMemoryProperties
+vkCreateInstance() → vkEnumeratePhysicalDevices() → vkCreateDevice()
+vkEnumerateInstanceExtensionProperties()  // 为了在创建 instance 前检索支持的扩展 VkExtensionProperties
+
+vkEnumerateInstanceLayerProperties 函数列出所有可以用的层
+vkGetPhysicalDeviceFeatures
+vkGetPhysicalDeviceProperties
+vkGetPhysicalDeviceMemoryProperties
 
 
-*** 创建一个VkInstance对象, 和选择物理设备（VkPhysicalDevice）
+*** 创建一个 VkInstance 对象, 和选择物理设备（VkPhysicalDevice）
 
-	- VkInstance: 创建完instance后，你可以获取支持Vulkan的可用硬件，然后从中选取一个或多个物理设备VkPhysicalDevice来使用。每个物理设备，你都可以获取它的属性vkGetPhysicalDeviceProperties，和特性vkGetPhysicalDeviceFeatures。一个VkInstance可以有多个VkPhysicalDevice，一个VkPhysicalDevice可以有多个逻辑设备VkDevice。目前跨GPU的调用还未实现。
+- VkInstance: 创建完 instance 后，你可以获取支持 Vulkan 的可用硬件，然后从中选取一个或多个物理设备 VkPhysicalDevice 来使用。每个物理设备，你都可以获取它的属性 vkGetPhysicalDeviceProperties，和特性 vkGetPhysicalDeviceFeatures。一个 VkInstance 可以有多个 VkPhysicalDevice，一个 VkPhysicalDevice 可以有多个逻辑设备 VkDevice。目前跨 GPU 的调用还未实现。
 
-*** 逻辑设备VkDevice 和 VkQueue 。
-	- 逻辑设备VkDevice：获取你想要的硬件设备(hardware device)后，就可以通过 VkPhysicalDeviceFeatures来描述你所需要的显卡特性，像多视图渲染( multi viewport rendering )和使用64bit的float等，然后根据这些特性创建VkDevice逻辑设备。当然，也可以告诉VkDevice你想要使用何种队列。Vulkan中的大多数操作，都是通过提交到 *VkQueue* 来异步执行的。Queue是从queue家族分配的，每个queue家族里的queue都支持特定的一些操作（这些操作构成一个集合）。例如，有的queue家族支持图形操作，有的支持计算操作，有的支持内存转移操作。Queue家族的能力也可作为选择物理设备条件。可能存在完全不支持图形功能的Vulkan设备。
+*** 逻辑设备 VkDevice 和 VkQueue 。
+- 逻辑设备 VkDevice：获取你想要的硬件设备(hardware device)后，就可以通过 VkPhysicalDeviceFeatures 来描述你所需要的显卡特性，像多视图渲染( multi viewport rendering )和使用 64bit 的 float 等，然后根据这些特性创建 VkDevice 逻辑设备。当然，也可以告诉 VkDevice 你想要使用何种队列。Vulkan 中的大多数操作，都是通过提交到 *VkQueue* 来异步执行的。Queue 是从 queue 家族分配的，每个 queue 家族里的 queue 都支持特定的一些操作（这些操作构成一个集合）。例如，有的 queue 家族支持图形操作，有的支持计算操作，有的支持内存转移操作。Queue 家族的能力也可作为选择物理设备条件。可能存在完全不支持图形功能的 Vulkan 设备。
 
-*** 创建一个窗口，窗口surface和交换链
-	- 窗口 *VkSurfaceKHR* ： 后缀KHR意思是这些对象是Vulkan扩展的一部分。除非你不想显示图形(比如你只想离屏渲染)，不然你还是需要创建一个窗口来显示的。Vulkan API是完全的平台不可知论者，这就是我们需要用标准化WSI（窗口系统接口）扩展与窗口管理器交互的原因。Surface是对可渲染窗口的跨平台抽象，一般通过提供一个本地窗口句柄的方式来实例化，例如在Windows上提供的句柄是HWND。幸运的是，GLFW库可以帮助我们处理不同平台的窗口问题。
+*** 创建一个窗口，窗口 surface 和交换链
+- 窗口 *VkSurfaceKHR* ： 后缀 KHR 意思是这些对象是 Vulkan 扩展的一部分。除非你不想显示图形(比如你只想离屏渲染)，不然你还是需要创建一个窗口来显示的。Vulkan API 是完全的平台不可知论者，这就是我们需要用标准化 WSI（窗口系统接口）扩展与窗口管理器交互的原因。Surface 是对可渲染窗口的跨平台抽象，一般通过提供一个本地窗口句柄的方式来实例化，例如在 Windows 上提供的句柄是 HWND。幸运的是，GLFW 库可以帮助我们处理不同平台的窗口问题。
 
-	- 交换链 *VkSwapchainKHR* ：Vulkan中没有 *默认帧缓冲区default framebuffer* 的概念。交换链本质上是一个等待 *呈现display* 给屏幕的图像队列, 用来确保当前正在 *渲染绘制render* 的image与当前正在呈现到屏幕的，不是同一个, 保证image完全渲染完毕后才能进行显示十分重要。交换链最初的目的是使绘制图像的最终呈现与屏幕的刷新频率同步。可以简单将交换链理解为一个队列，同步生产者：即应用程序绘制图像，和消费者：屏幕刷新的Produce-Consume关系。每次我们想绘制一帧时draw a frame，我们请求交换链提供给我们一个用于渲染的image，当这一帧完成绘制后，这个image返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。有的平台允许你直接渲染到显示器，无需与窗口管理器交互，只要使用 *VK_KHR_display* 和 *VK_KHR_display_swapchain* 扩展即可。这样你就可以创建一个代表整个显示器区域的surface，用其实现自己的窗口管理器。
+- 交换链 *VkSwapchainKHR* ：Vulkan 中没有 *默认帧缓冲区 default framebuffer* 的概念。交换链本质上是一个等待 *呈现 display* 给屏幕的图像队列, 用来确保当前正在 *渲染绘制 render* 的 image 与当前正在呈现到屏幕的，不是同一个, 保证 image 完全渲染完毕后才能进行显示十分重要。交换链最初的目的是使绘制图像的最终呈现与屏幕的刷新频率同步。可以简单将交换链理解为一个队列，同步生产者：即应用程序绘制图像，和消费者：屏幕刷新的 Produce-Consume 关系。每次我们想绘制一帧时 draw a frame，我们请求交换链提供给我们一个用于渲染的 image，当这一帧完成绘制后，这个 image 返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。有的平台允许你直接渲染到显示器，无需与窗口管理器交互，只要使用 *VK_KHR_display* 和 *VK_KHR_display_swapchain* 扩展即可。这样你就可以创建一个代表整个显示器区域的 surface，用其实现自己的窗口管理器。
 
 *** VkImageView 和 VkFrameBuffer
-	- imageView引用一个image将要被使用的特定部分，Framebuffer其实就是一堆VkImageView，framebuffer引用imageView ，把它当做color 、depth和stencil的目标使用。因为swapchain里可以有多个image。
-	- Frame buffer帧缓冲区封装了 color buffer image和depth buffer image。其中color buffer image为从swap chain获取的image，frame buffer的创建个数需要跟swap chain的image的数量对应.
+- imageView 引用一个 image 将要被使用的特定部分，Framebuffer 其实就是一堆 VkImageView，framebuffer 引用 imageView ，把它当做 color 、depth 和 stencil 的目标使用。因为 swapchain 里可以有多个 image。
+- Frame buffer 帧缓冲区封装了 color buffer image 和 depth buffer image。其中 color buffer image 为从 swap chain 获取的 image，frame buffer 的创建个数需要跟 swap chain 的 image 的数量对应.
 
 *** 创建渲染通道 Render pass，它标明渲染目标和用法
-	- render layer是把不同的物体放到不同的layer层里去渲染，比如前景放到一层，背景放到一层，所以每个层里渲染出来的图像包括的物体的所有信息。比如物体的高光，颜色，反光，阴影等等都在一个层里。
-	- render passes.是指把一个物体的所有信息，分开来进行渲染，比如颜色pass、高光passes、环境光遮挡等等其他passes。为什么我们要用不同的pass来渲染呢？在源头就将这些信息独立开来，这样在合成的时候我们就可以有更多的控制空间和选择余地了。
+- render layer 是把不同的物体放到不同的 layer 层里去渲染，比如前景放到一层，背景放到一层，所以每个层里渲染出来的图像包括的物体的所有信息。比如物体的高光，颜色，反光，阴影等等都在一个层里。
+- render passes.是指把一个物体的所有信息，分开来进行渲染，比如颜色 pass、高光 passes、环境光遮挡等等其他 passes。为什么我们要用不同的 pass 来渲染呢？在源头就将这些信息独立开来，这样在合成的时候我们就可以有更多的控制空间和选择余地了。
 
-	- Render pass描述了在渲染阶段要使用的image类型、如何使用以及如何处理image的内容。请注意，Render pass只是描述要使用的image类型，而framebuffer( 通过绑定image )才是要使用的image实体。
-	- VkRenderPass由多个子pass组成。在简单的场景一般只有一个子pass。子pass选择一些attachment作为颜色目标，另外一些作为深度和模版目标。如果你有多个子pass，每个子pass将有不同的集合，一些用于输入，一些用于输出。
+- Render pass 描述了在渲染阶段要使用的 image 类型、如何使用以及如何处理 image 的内容。请注意，Render pass 只是描述要使用的 image 类型，而 framebuffer( 通过绑定 image )才是要使用的 image 实体。
+- VkRenderPass 由多个子 pass 组成。在简单的场景一般只有一个子 pass。子 pass 选择一些 attachment 作为颜色目标，另外一些作为深度和模版目标。如果你有多个子 pass，每个子 pass 将有不同的集合，一些用于输入，一些用于输出。
 
 *** 创建帧缓存，它引用渲染通道
-	color attachment为从swap chain获取的image，depth/stencil attachment为depth buffer的image。
+color attachment 为从 swap chain 获取的 image，depth/stencil attachment 为 depth buffer 的 image。
 
-*** 构建图形管线Graphics pipeline
-	- Graphics Pipeline通过创建VkPipeline对象来建立。它描述了一些显卡 *不可编程部分* 的可配置状态(configurable state )，比如viewport的大小和depth buffer操作等，以及用 *VkShaderModule表示的可编程部分* 。VkShaderModule对象用着色器的字节码来创建。驱动需要知道哪些渲染目标将在pipeline中使用，而这些目标就是我们在Render pass中定义的image。
+*** 构建图形管线 Graphics pipeline
+- Graphics Pipeline 通过创建 VkPipeline 对象来建立。它描述了一些显卡 *不可编程部分* 的可配置状态(configurable state )，比如 viewport 的大小和 depth buffer 操作等，以及用 *VkShaderModule 表示的可编程部分* 。VkShaderModule 对象用着色器的字节码来创建。驱动需要知道哪些渲染目标将在 pipeline 中使用，而这些目标就是我们在 Render pass 中定义的 image。
 
-	- Vulkan和现存的其他图形API最显著地区别就是：几乎所有不可编程部分的配置都要在pipeline创建前提前完成。这就意味着如果你想换一个着色器(shader)或者仅仅改变一些顶点的布局(vertex layout) ,那么你必须重新创建pipeline 。这也意味着你必须提前创建很多pipeline，来应对渲染过程中不同组合的配置。只有很少的一些配置你可以动态改变，比如viewport 的大小和celar 的颜色等。Pipeline中所有的配置状态你必须显示的进行定义，比如，颜色混合就没有为你提供默认的配置。
+- Vulkan 和现存的其他图形 API 最显著地区别就是：几乎所有不可编程部分的配置都要在 pipeline 创建前提前完成。这就意味着如果你想换一个着色器(shader)或者仅仅改变一些顶点的布局(vertex layout) ,那么你必须重新创建 pipeline 。这也意味着你必须提前创建很多 pipeline，来应对渲染过程中不同组合的配置。只有很少的一些配置你可以动态改变，比如 viewport 的大小和 celar 的颜色等。Pipeline 中所有的配置状态你必须显示的进行定义，比如，颜色混合就没有为你提供默认的配置。
 
-*** 申请命令缓存，为交换链的每个image记录绘制命令
-	Vulkan中的命令必须提交到对应的队列queue才能执行。这些命令首先要记录到VkCommandBuffer中，然后才能提交的到队列。VkCommandBuffer并不是直接创建的，它是从VkCommandPool中分配出来的。
+*** 申请命令缓存，为交换链的每个 image 记录绘制命令
+Vulkan 中的命令必须提交到对应的队列 queue 才能执行。这些命令首先要记录到 VkCommandBuffer 中，然后才能提交的到队列。VkCommandBuffer 并不是直接创建的，它是从 VkCommandPool 中分配出来的。
 
-*** 渲染一帧：请求image，提交正确的绘制命令缓存，将image返回到交换链
+*** 渲染一帧：请求 image，提交正确的绘制命令缓存，将image返回到交换链
