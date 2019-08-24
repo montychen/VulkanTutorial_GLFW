@@ -1,6 +1,15 @@
  #+begin_center
 * *Vulkan is an API for graphics and compute hardware*
  #+end_center
+
+** four types of functionality that queues may support:
+- graphics：图形
+- compute：计算
+- transfer：传送
+- sparse memory management：内存绑定操作，用于更新稀疏资源。
+  * 在矩阵中，若数值为0的元素远远多于非0元素，并且非0元素分布没有规律时，则称该矩阵为 *稀疏矩阵* ；与之相反，若非0元素占大多数时，则称该矩阵为 *稠密矩阵* 。
+  * *稀疏内存* 是一项特殊功能，可让您存储大型图像资源；图像在内存中的存储容量远大于实际的存储容量。 这种技术是将图像分解为图块，并仅加载适合应用程序逻辑的图块。
+
 * Mac 下载安装 Vulkan SDK:
    1. 从 lunarg 下载 [[https://vulkan.lunarg.com/home/welcome]] Vulkan SDK 的 MacOS 版本， Mac/iOS 下的 Vulkan 并非原生实现，而是通过 *MoltenVK* [[https://github.com/KhronosGroup/MoltenVK]]  作为中间层调用 Metal 来实现的。
    2. 下载 Vulkan SDK 后，将它解压到一个合适的位置。 *Vulkan SDK 的 MacOS 版，已经内置了编译好的 MoltenVK。*
