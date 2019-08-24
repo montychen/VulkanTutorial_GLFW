@@ -1,4 +1,4 @@
-* Mac 下载安装 Vulkan SDK
+* Mac 下载安装 Vulkan SDK: Vulkan is an API for graphics and compute hardware
    1. 从 lunarg 下载 [[https://vulkan.lunarg.com/home/welcome]] Vulkan SDK 的 MacOS 版本， Mac/iOS 下的 Vulkan 并非原生实现，而是通过 *MoltenVK* [[https://github.com/KhronosGroup/MoltenVK]]  作为中间层调用 Metal 来实现的。
    2. 下载 Vulkan SDK 后，将它解压到一个合适的位置。 *Vulkan SDK 的 MacOS 版，已经内置了编译好的 MoltenVK。*
    3. 然后在 ~/.bash_profile 文件中设置下面这些环境变变量。详见 [[https://vulkan.lunarg.com/doc/sdk/1.1.92.1/mac/getting_started.html]]
