@@ -1,5 +1,5 @@
  #+begin_center
-* Vulkan is an API for graphics and compute hardware
+Vulkan is an API for graphics and compute hardware
  #+end_center
 * Mac 下载安装 Vulkan SDK:
    1. 从 lunarg 下载 [[https://vulkan.lunarg.com/home/welcome]] Vulkan SDK 的 MacOS 版本， Mac/iOS 下的 Vulkan 并非原生实现，而是通过 *MoltenVK* [[https://github.com/KhronosGroup/MoltenVK]]  作为中间层调用 Metal 来实现的。
