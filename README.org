@@ -93,6 +93,8 @@ make   #编译
 8) : vkCreateShaderModule() 在 Vulkan 中，图形管线几乎完全不允许进行动态设置，如果我们 想使用其它着色器，绑定其它帧缓冲，以及改变混合函数，都需要重新创 建管线。这就迫使我们必须提前创建所有我们需要使用的图形管线，虽然 这样看起来不太方便，但这给驱动程序带来了很大的优化空间。
 
 
+#+ATTR_latex: :width 800
+#+ATTR_HTML: :width 800
 #+ATTR_ORG: :width 800
 [[file:vulkan_pipeline.png]]
 
@@ -147,6 +149,8 @@ Vulkan 中的命令必须提交到对应的队列 queue 才能执行。这些命
 
 
 * 基本的Vulkan编程流程：
+#+ATTR_latex: :width 800
+#+ATTR_HTML: :width 800
 #+ATTR_ORG: :width 800
 [[file:vulkan_program_flow.jpg]]
 
