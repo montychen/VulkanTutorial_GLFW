@@ -1,6 +1,6 @@
 // GLFW将包含它自己的定义，且自动加载Vulkan头文件<vulkan/vulkan.h>
 #define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h> 
+#include <GLFW/glfw3.h>
 
 #include <iostream>
 #include <stdexcept>
@@ -304,13 +304,13 @@ private:
         createInfo.imageFormat = surfaceFormat.format;
         createInfo.imageColorSpace = surfaceFormat.colorSpace;
         createInfo.imageExtent = extent;
-        createInfo.imageArrayLayers = 1; // 表示image的层次，除非创建3D应用，否则这个值将为1. 
+        createInfo.imageArrayLayers = 1; // 表示image的层次，除非创建3D应用，否则这个值将为1.
         createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // imageUsage指明Swap Chain里的image我们拿来做什么，在本例中我们将直接对image进行渲染，这就意味着Image将被当做颜色附件使用(color attachment)。如果你想先渲染一个单独的图片然后再进行处理，那就应该使用VK_IMAGE_USAGE_TRANSFER_DST_BIT并使用内存转换操作将渲染好的image 转换到SwapChain里。
 
         QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
         uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
 
-		// 如果grapics queue 和 present queue不相同，就会出现这多种队列访问image的情况：我们在grapics queue 中绘制image,然后将它提交到presention queue 去等待显示。 
+		// 如果grapics queue 和 present queue不相同，就会出现这多种队列访问image的情况：我们在grapics queue 中绘制image,然后将它提交到presention queue 去等待显示。
         if (indices.graphicsFamily != indices.presentFamily) {
             createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT; // VK_SHARING_MODE_CONCURRENT：。Image可以在多个队列家族使用，无需显式地转移所有权。
             createInfo.queueFamilyIndexCount = 2;					  // 并发模式要求你用queueFamilyIndexCount 和pQueueFamilyIndices 参数，提前标明，所有权将在哪些队列家族中共享。
@@ -322,7 +322,7 @@ private:
         createInfo.preTransform = swapChainSupport.capabilities.currentTransform; // 这里是不对Image进行变换。 如果某个要支持莫个变换如，90度或水平翻转，我们可以标明让它应用到交换链中的image上。
         createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // 忽略和其他窗口颜色混合时的Alpha 通道
         createInfo.presentMode = presentMode;
-        createInfo.clipped = VK_TRUE;    // 不处理那些被遮盖的像素 
+        createInfo.clipped = VK_TRUE;    // 不处理那些被遮盖的像素
 
         createInfo.oldSwapchain = VK_NULL_HANDLE;
 
@@ -357,7 +357,7 @@ private:
 	// VK_PRESENT_MODE_FIFO_RELAXED_KHR：只有当垂直回归结束后，app晚了，队列空了，这一模式才与上一个模式有所区别。它不等待下一次垂直回归，而是当image到达时立即传送。这可能导致可见的撕裂。
 	// VK_PRESENT_MODE_MAILBOX_KHR：这是第二个模式的另一个变种。队列满时候，它不阻塞app，队列中的image直接就被新的替换掉了。这个模式可以被用于实现三缓存，其允许你避免撕裂，且大幅减少延迟问题（与双缓存的垂直同步模式相比）。
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
-        VkPresentModeKHR bestMode = VK_PRESENT_MODE_FIFO_KHR; 
+        VkPresentModeKHR bestMode = VK_PRESENT_MODE_FIFO_KHR;
 
         for (const auto& availablePresentMode : availablePresentModes) {
             if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) { // 三缓冲更加绝妙(nice)，可以先看看有没有它.
