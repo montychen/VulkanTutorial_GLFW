@@ -1,14 +1,7 @@
 #+begin_center
-* *Vulkan is an API for graphics and compute hardware*
+*Vulkan is an API for graphics and compute hardware*
+不仅仅用于图形渲染，还可用于计算
 #+end_center
-
-** four types of functionality that queues may support:
-- graphics：图形
-- compute：计算
-- transfer：传送
-- sparse memory management：内存绑定操作，用于更新稀疏资源。
-  * 在矩阵中，若数值为0的元素远远多于非0元素，并且非0元素分布没有规律时，则称该矩阵为 *稀疏矩阵* ；与之相反，若非0元素占大多数时，则称该矩阵为 *稠密矩阵* 。
-  * *稀疏内存* 是一项特殊功能，可让您存储大型图像资源；图像在内存中的存储容量远大于实际的存储容量。 这种技术是将图像分解为图块，并仅加载适合应用程序逻辑的图块。
 
 * Mac 下载安装 Vulkan SDK:
 1. 从 lunarg 下载 [[https://vulkan.lunarg.com/home/welcome]] Vulkan SDK 的 MacOS 版本， Mac/iOS 下的 Vulkan 并非原生实现，而是通过 *MoltenVK* [[https://github.com/KhronosGroup/MoltenVK]]  作为中间层调用 Metal 来实现的。
@@ -78,16 +71,20 @@ make   #编译
 
 ** Xcode 使用 Vulkan SDK 的开发环境配置，可以参考 *Vulkan Tutorial* 这本书中的设置 [[https://vulkan-tutorial.com/Development_environment#page_MacOS ]]
 
-* Vulkan 介绍：Vulkan 不仅仅用于图形渲染，还可用于纯粹的计算。
 
-** Vulkan 初始化流程 ：
+* Vulkan vs OpenGL
+在有一些场景中，我们将观察到，OpenGL 和 Vulkan 之间在性能方面没有任何差别。 如果不需要多线程化，或应用不是 *CPU 密集型* （渲染的场景不太复杂），使用 OpenGL 即可，而且使用 Vulkan  不会实现性能提升 （但可能会 *降低功耗， 这对移动设备至关重要* ）。 但如果我们想最大限度地发挥图形硬件的功能，Vulkan 将是最佳选择。
 
+
+* Vulkan 初始化流程 ：
 
 1) vkCreateInstance()： VkInstanceCreateInfo +  VkApplicationInfo  创建实例
 2) vkCreateDebugUtilsMessengerEXT：启用 VK_LAYER_KHRONOS_validation 验证层后，定义一个用来接收消息的回调函数 debugCallback。为了接收消息，我们还要启用 VK_EXT_debug_utils 扩展。
 3) glfwCreateWindowSurface：窗口 surface 需要在 instance 被创建后立即被创建，因为它实际上会影响物理设备的选择。
+
 4) vkEnumeratePhysicalDevices() -> vkGetPhysicalDeviceQueueFamilyProperties() 根据合适的队列簇，选择物理设备, 为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
 5) vkCreateDevice(): VkDeviceCreateInfo + VkDeviceQueueCreateInfo  创建逻辑设备、队列随着逻辑设备的创建而自动创建。
+   
 6) vkCreateSwapchainKHR()
 7) vkCreateImageView(): 为了使用 VkImage,不管是在 SwapChain 还是在 Pipeline 中，都必须先创建 VkImageView, 它是 image 的一个 view，描述了我们如何访问 image、访问 image 的哪一部分等。
 8) : vkCreateShaderModule() 在 Vulkan 中，图形管线几乎完全不允许进行动态设置，如果我们 想使用其它着色器，绑定其它帧缓冲，以及改变混合函数，都需要重新创 建管线。这就迫使我们必须提前创建所有我们需要使用的图形管线，虽然 这样看起来不太方便，但这给驱动程序带来了很大的优化空间。
@@ -99,9 +96,6 @@ make   #编译
 [[file:vulkan_pipeline.png]]
 
 
-
-
-
 vkCreateInstance() → vkEnumeratePhysicalDevices() → vkCreateDevice()
 vkEnumerateInstanceExtensionProperties()  // 为了在创建 instance 前检索支持的扩展 VkExtensionProperties
 
@@ -111,41 +105,115 @@ vkGetPhysicalDeviceProperties
 vkGetPhysicalDeviceMemoryProperties
 
 
-*** 创建一个 VkInstance 对象, 和选择物理设备（VkPhysicalDevice）
+* 初始化过程涉及的对象
 
-- VkInstance: 创建完 instance 后，你可以获取支持 Vulkan 的可用硬件，然后从中选取一个或多个物理设备 VkPhysicalDevice 来使用。每个物理设备，你都可以获取它的属性 vkGetPhysicalDeviceProperties，和特性 vkGetPhysicalDeviceFeatures。一个 VkInstance 可以有多个 VkPhysicalDevice，一个 VkPhysicalDevice 可以有多个逻辑设备 VkDevice。目前跨 GPU 的调用还未实现。
+** 创建一个 VkInstance 对象, 和选择物理设备（VkPhysicalDevice）
+- VkInstance: 创建完 instance 后，你可以获取支持 Vulkan 的可用硬件，然后从中选取一个或多个物理设备 VkPhysicalDevice 来使用。每个物理设备，你都可以获取它的属性 vkGetPhysicalDeviceProperties，和特性 vkGetPhysicalDeviceFeatures。一个 VkInstance 可以对应多个 VkPhysicalDevice，一个 VkPhysicalDevice 也可以创建多个逻辑设备 VkDevice。目前跨 GPU 的调用还未实现。
+- 基于逻辑设备的验证层已经废弃， 现在推荐在实例上启用验证validation layer。
 
-*** 逻辑设备 VkDevice 和 VkQueue 。
+*** example code
+#+begin_src c++
+// checkValidationLayerSupport
+vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); // 获得所有验证层
+// getRequiredExtensions
+glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+vkCreateInstance(&createInfo, nullptr, &instance)
+
+// createSurface
+glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS);
+
+{// pickPhysicalDevice
+
+	vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data()); // 枚举GPU
+	{ // isDeviceSuitable
+		{// findQueueFamilies
+			vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport); // 查询能够呈现到窗口surface的队列家族，该函数以物理设备，队列家族索引和surface为参数。
+		}
+
+		//checkDeviceExtensionSupport
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+		{ // querySwapChainSupport
+			vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
+			vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data()); // Surface格式（像素格式，颜色空间）
+			vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式
+		}
+	}}
+
+{// createLogicalDevice
+	queueCreateInfo.queueFamilyIndex = queueFamily;
+	deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
+
+	createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+	createInfo.ppEnabledLayerNames = validationLayers.data();
+
+	vkCreateDevice(physicalDevice, &createInfo, nullptr, &device);  // 队列随着逻辑设备的创建而自动创建
+
+	vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue); // 用vkGetDeviceQueue函数从队列家族获取队列句柄，并保存在graphicsQueue。因为我们只创建一个队列，用索引0即可。
+	vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
+}
+
+{// createSwapChain
+}
+#+end_src
+
+** 逻辑设备 VkDevice 和 VkQueue 。
 - 逻辑设备 VkDevice：获取你想要的硬件设备(hardware device)后，就可以通过 VkPhysicalDeviceFeatures 来描述你所需要的显卡特性，像多视图渲染( multi viewport rendering )和使用 64bit 的 float 等，然后根据这些特性创建 VkDevice 逻辑设备。当然，也可以告诉 VkDevice 你想要使用何种队列。Vulkan 中的大多数操作，都是通过提交到 *VkQueue* 来异步执行的。Queue 是从 queue 家族分配的，每个 queue 家族里的 queue 都支持特定的一些操作（这些操作构成一个集合）。例如，有的 queue 家族支持图形操作，有的支持计算操作，有的支持内存转移操作。Queue 家族的能力也可作为选择物理设备条件。可能存在完全不支持图形功能的 Vulkan 设备。
+*** 队列queue的职责是收集命令（命令缓冲区）并将其分派给物理设备执行。一共有4中队列
+- graphics：图形
+- compute：计算
+- transfer：传送
+- sparse memory management：内存绑定操作，用于更新稀疏资源。
+  - 在矩阵中，若数值为0的元素远远多于非0元素，并且非0元素分布没有规律时，则称该矩阵为 *稀疏矩阵* ；与之相反，若非0元素占大多数时，则称该矩阵为 *稠密矩阵* 。
+  - *稀疏内存* 是一项特殊功能，可让您存储大型图像资源；图像在内存中的存储容量远大于实际的存储容量。 这种技术是将图像分解为图块，并仅加载适合应用程序逻辑的图块。
 
-*** 创建一个窗口，窗口 surface 和交换链
+
+** 创建一个窗口，窗口 surface 和交换链
 - 窗口 *VkSurfaceKHR* ： 后缀 KHR 意思是这些对象是 Vulkan 扩展的一部分。除非你不想显示图形(比如你只想离屏渲染)，不然你还是需要创建一个窗口来显示的。Vulkan API 是完全的平台不可知论者，这就是我们需要用标准化 WSI（窗口系统接口）扩展与窗口管理器交互的原因。Surface 是对可渲染窗口的跨平台抽象，一般通过提供一个本地窗口句柄的方式来实例化，例如在 Windows 上提供的句柄是 HWND。幸运的是，GLFW 库可以帮助我们处理不同平台的窗口问题。
 
-- 交换链 *VkSwapchainKHR* ：Vulkan 中没有 *默认帧缓冲区 default framebuffer* 的概念。交换链本质上是一个等待 *呈现 display* 给屏幕的图像队列, 用来确保当前正在 *渲染绘制 render* 的 image 与当前正在呈现到屏幕的，不是同一个, 保证 image 完全渲染完毕后才能进行显示十分重要。交换链最初的目的是使绘制图像的最终呈现与屏幕的刷新频率同步。可以简单将交换链理解为一个队列，同步生产者：即应用程序绘制图像，和消费者：屏幕刷新的 Produce-Consume 关系。每次我们想绘制一帧时 draw a frame，我们请求交换链提供给我们一个用于渲染的 image，当这一帧完成绘制后，这个 image 返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。有的平台允许你直接渲染到显示器，无需与窗口管理器交互，只要使用 *VK_KHR_display* 和 *VK_KHR_display_swapchain* 扩展即可。这样你就可以创建一个代表整个显示器区域的 surface，用其实现自己的窗口管理器。
+- 交换链 *VkSwapchainKHR* ：Vulkan 中没有 *默认帧缓冲区 default framebuffer* 的概念。交换链确保当窗口系统在显示一个图像时，应用程序可以准备下一个图像，保证 image 完全渲染完毕后才能进行显示十分重要。交换链最初的目的是使绘制图像的最终呈现与屏幕的刷新频率同步。
 
-*** VkImageView 和 VkFrameBuffer
+- 可以简单将交换链理解为一个队列，同步生产者(即应用程序绘制图像)和消费者(屏幕刷新)的关系。每次我们想绘制一帧时，我们请求交换链提供给我们一个用于渲染的 image，当这一帧完成绘制后，这个 image 返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。有的平台允许你直接渲染到显示器，无需与窗口管理器交互，只要使用 *VK_KHR_display* 和 *VK_KHR_display_swapchain* 扩展即可。这样你就可以创建一个代表整个显示器区域的 surface，用其实现自己的窗口管理器。
+
+- 如果支持交换链，实际上会涉及到三种扩展：两种来源于实例层，一种来源于设备层。
+  - 第一种是在实例层定义的 *VK_KHR_surface* 扩展。 它可描述“平面”对象，即应用窗口的逻辑表现形式。 该扩展支持我们查看平面的不同参数（功能、支持的格式、大小），并查询特定物理设备是否支持交换链 （更确切的说，特定队列家族是否支持 在特定平面上演示图像）。 这些信息非常实用，因为我们不想选择物理设备并尝试通过它创建逻辑设备，来了解它是否支持交换链。 该扩展还可定义破环此类平面的方法。
+  - 第二种实例层扩展依赖于操作系统：在 Windows中称为 VK_KHR_win32_surface，在Linux中称为 VK_KHR_xlib_surface 或 VK_KHR_xcb_surface。 该扩展支持我们创建在特定操作系统中展现应用窗口 （并使用特定于操作系统的参数）的平面。
+  - *glfwgetrequiredinstanceextensionsll* 函数返回vulkan实例层用来创建surface所需要的 *实例扩展* 列表，不但包含了 VK_KHR_surface扩展， 还包含了针对特定平台的surface扩展，它处理了平台相关的差异。
+
+
+
+** VkImageView 和 VkFrameBuffer
 - imageView 引用一个 image 将要被使用的特定部分，Framebuffer 其实就是一堆 VkImageView，framebuffer 引用 imageView ，把它当做 color 、depth 和 stencil 的目标使用。因为 swapchain 里可以有多个 image。
 - Frame buffer 帧缓冲区封装了 color buffer image 和 depth buffer image。其中 color buffer image 为从 swap chain 获取的 image，frame buffer 的创建个数需要跟 swap chain 的 image 的数量对应.
 
-*** 创建渲染通道 Render pass，它标明渲染目标和用法
+** 创建渲染通道 Render pass，它标明渲染目标和用法
 - render layer 是把不同的物体放到不同的 layer 层里去渲染，比如前景放到一层，背景放到一层，所以每个层里渲染出来的图像包括的物体的所有信息。比如物体的高光，颜色，反光，阴影等等都在一个层里。
 - render passes.是指把一个物体的所有信息，分开来进行渲染，比如颜色 pass、高光 passes、环境光遮挡等等其他 passes。为什么我们要用不同的 pass 来渲染呢？在源头就将这些信息独立开来，这样在合成的时候我们就可以有更多的控制空间和选择余地了。
 
 - Render pass 描述了在渲染阶段要使用的 image 类型、如何使用以及如何处理 image 的内容。请注意，Render pass 只是描述要使用的 image 类型，而 framebuffer( 通过绑定 image )才是要使用的 image 实体。
 - VkRenderPass 由多个子 pass 组成。在简单的场景一般只有一个子 pass。子 pass 选择一些 attachment 作为颜色目标，另外一些作为深度和模版目标。如果你有多个子 pass，每个子 pass 将有不同的集合，一些用于输入，一些用于输出。
 
-*** 创建帧缓存，它引用渲染通道
+** 创建帧缓存，它引用渲染通道
 color attachment 为从 swap chain 获取的 image，depth/stencil attachment 为 depth buffer 的 image。
 
-*** 构建图形管线 Graphics pipeline
+** 构建图形管线 Graphics pipeline
 - Graphics Pipeline 通过创建 VkPipeline 对象来建立。它描述了一些显卡 *不可编程部分* 的可配置状态(configurable state )，比如 viewport 的大小和 depth buffer 操作等，以及用 *VkShaderModule 表示的可编程部分* 。VkShaderModule 对象用着色器的字节码来创建。驱动需要知道哪些渲染目标将在 pipeline 中使用，而这些目标就是我们在 Render pass 中定义的 image。
 
 - Vulkan 和现存的其他图形 API 最显著地区别就是：几乎所有不可编程部分的配置都要在 pipeline 创建前提前完成。这就意味着如果你想换一个着色器(shader)或者仅仅改变一些顶点的布局(vertex layout) ,那么你必须重新创建 pipeline 。这也意味着你必须提前创建很多 pipeline，来应对渲染过程中不同组合的配置。只有很少的一些配置你可以动态改变，比如 viewport 的大小和 celar 的颜色等。Pipeline 中所有的配置状态你必须显示的进行定义，比如，颜色混合就没有为你提供默认的配置。
 
-*** 申请命令缓存，为交换链的每个 image 记录绘制命令
-Vulkan 中的命令必须提交到对应的队列 queue 才能执行。这些命令首先要记录到 VkCommandBuffer 中，然后才能提交的到队列。VkCommandBuffer 并不是直接创建的，它是从 VkCommandPool 中分配出来的。
+** 申请命令缓存，为交换链的每个 image 记录绘制命令
+- Vulkan中的命令要先记录到VkCommandBuffer中，然后才能提交到队列queue，由队列将这些作业提交给物理设备去执行。VkCommandBuffer并不是直接创建的，它的构建非常昂贵， 它从VkCommandPool 中分配出来。
+- 创建 *Command Buffer* 的三个重要元素分别为 VkDescriptorSet（纹理和常量）、VkPipeline（着色器和状态）和VkBuffer（顶点数组）
 
-*** 渲染一帧：请求 image，提交正确的绘制命令缓存，将 image 返回到交换链
+** 渲染一帧：请求 image，提交正确的绘制命令缓存，将 image 返回到交换链
+
+
+* Buffer和内存 & 数据传输
+- 创建Buffer之前都要先申请分配相应的内存，因为无论是Texture、VertexBuffer、IndexBuffer或者UniformBuffer等等，其实都最终都是一段内存，因此Vulkan将这些资源都视为Buffer。创建Buffer 时就需要指定 Buffer的大小、用途、共享模式等等。
+- 由于在GPU中需要内存对齐，因此我们的Buffer大小与实际内存可能并不一致。为了获取不同资源对应的内存对齐大小以及需要实际分配的内存大小，Vulkan提供了vkGetBufferMemoryRequirements函数供我们使用。分配好内存之后，就可以将 Buffer于内存绑定到一起。
+- 高速缓存具有最高的访问速度。其次就是访问各自独占的存储，而最慢的就是访问共享内存了，当然对于CPU来说访问共享内存与自己独占的内存在性能是基本没有差异的。这里的性能差异主要是从GPU的角度来说的。因此我们肯定愿意将一些CPU或GPU专有 的数据首先考虑放在各自的独占存储中，其次需要多方来访问的数据就放在共享内存中。
+- 说了这么废话，就是为了给数据传输做铺垫。对于UniformBuffer，我们可能更希望将它放置于共享内存中，对于Texture、Vertex、Index等等我们更希望将它们放置于GPU的独立内存中。因此，对于UniformBuffer， 我们只需要在共享内存或者高速缓存上面分配内存，绑定到Buffer。对于其它数据，我们则需要先在共享内存或者高速缓存上分配临时内存，绑定临时Buffer，然后将数据拷贝至于该块内存，最后则创建真正的Buffer以及在GPU上分配独立的内存，通过 Transfer Command将数据从共享内存或者高速缓存拷贝至GPU内存。
 
 
 * 基本的Vulkan编程流程：
@@ -155,4 +223,3 @@ Vulkan 中的命令必须提交到对应的队列 queue 才能执行。这些命
 [[file:vulkan_program_flow.jpg]]
 
 
-- 创建 *Command Buffer* 的三个重要元素分别为 VkDescriptorSet（纹理和常量）、VkPipeline（着色器和状态）和VkBuffer（顶点数组）
