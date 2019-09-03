@@ -105,13 +105,7 @@ vkGetPhysicalDeviceProperties
 vkGetPhysicalDeviceMemoryProperties
 
 
-* 初始化过程涉及的对象
-
-** 创建一个 VkInstance 对象, 和选择物理设备（VkPhysicalDevice）
-- VkInstance: 创建完 instance 后，你可以获取支持 Vulkan 的可用硬件，然后从中选取一个或多个物理设备 VkPhysicalDevice 来使用。每个物理设备，你都可以获取它的属性 vkGetPhysicalDeviceProperties，和特性 vkGetPhysicalDeviceFeatures。一个 VkInstance 可以对应多个 VkPhysicalDevice，一个 VkPhysicalDevice 也可以创建多个逻辑设备 VkDevice。目前跨 GPU 的调用还未实现。
-- 基于逻辑设备的验证层已经废弃， 现在推荐在实例上启用验证validation layer。
-
-*** example code
+* example code
 #+begin_src c++
 // checkValidationLayerSupport
 vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); // 获得所有验证层
@@ -124,43 +118,63 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS);
 
 {// pickPhysicalDevice
 
-	vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data()); // 枚举GPU
-	{ // isDeviceSuitable
-		{// findQueueFamilies
-			vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
-			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport); // 查询能够呈现到窗口surface的队列家族，该函数以物理设备，队列家族索引和surface为参数。
-		}
+    vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
+    { // isDeviceSuitable
+        {
+            vkGetPhysicalDeviceProperties; // 查询物理设备的属性：支持的Vulkan API版本、设备名称和类型（集成或专用/独立GPU）、厂商ID和限制。
+            vkGetPhysicalDeviceFeatures; // 查询物理设备的特性：纹理压缩、64位浮点数和多视口渲染
+            vkGetPhysicalDeviceQueueFamilyProperties; //获取物理设备的 队列属性
 
-		//checkDeviceExtensionSupport
-		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+            vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies.data());  // findQueueFamilies
+            vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); // 查询能够呈现到窗口surface的队列家族，该函数以物理设备，队列家族索引和surface为参数。
+        }
 
-		{ // querySwapChainSupport
-			vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
-			vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data()); // Surface格式（像素格式，颜色空间）
-			vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式
-		}
-	}}
+        //checkDeviceExtensionSupport
+        vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data());
+
+        { // querySwapChainSupport
+            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
+            vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素格式，颜色空间）
+            vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式
+        }
+    }}
 
 {// createLogicalDevice
-	queueCreateInfo.queueFamilyIndex = queueFamily;
-	deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
+    queueCreateInfo.queueFamilyIndex = queueFamily;
+    deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
 
-	createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-	createInfo.ppEnabledLayerNames = validationLayers.data();
+    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+    createInfo.ppEnabledLayerNames = validationLayers.data();
 
-	vkCreateDevice(physicalDevice, &createInfo, nullptr, &device);  // 队列随着逻辑设备的创建而自动创建
+    vkCreateDevice(gpu, &createInfo, nullptr, &device);  // 队列随着逻辑设备的创建而自动创建
 
-	vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue); // 用vkGetDeviceQueue函数从队列家族获取队列句柄，并保存在graphicsQueue。因为我们只创建一个队列，用索引0即可。
-	vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
+    vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue); // 用vkGetDeviceQueue函数从队列家族获取队列句柄，并保存在graphicsQueue。因为我们只创建一个队列，用索引0即可。
+    vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 }
 
 {// createSwapChain
 }
 #+end_src
 
+
+* 初始化过程涉及的对象
+
+** 创建一个 VkInstance 对象, 和选择物理设备（VkPhysicalDevice）
+- 物理设备可以简单的将它和GPU硬件对应起来。例如集成显卡对应一个物理设备，独立显卡RTX2080TI对应一个物理设备。那么一台设备上会出现多个GPU硬件，例如：集成显卡Intel(R) HD Graphics 630、独立显卡RTX2080TI、计算卡NVIDIA P106。
+- VkInstance: 创建完 instance 后，你可以获取支持 Vulkan 的可用硬件，然后从中选取一个或多个物理设备 VkPhysicalDevice 来使用。每个物理设备，你都可以获取它的属性 vkGetPhysicalDeviceProperties，和特性 vkGetPhysicalDeviceFeatures。一个 VkInstance 可以对应多个 VkPhysicalDevice，一个 VkPhysicalDevice 也可以创建多个逻辑设备 VkDevice。目前跨 GPU 的调用还未实现。
+- 基于逻辑设备的验证层已经废弃， 现在推荐在实例上启用验证validation layer。
+
 ** 逻辑设备 VkDevice 和 VkQueue 。
+- 为什么需要创建逻辑设备，不直接使用物理设备。 因为大多数时候我们并不需要物理设备的全部功能，在不同的场景下，只会开启其中的部分功能。比如在挖矿、视频解压等这种情况下就不需要渲染簇；只需要画面显示的应用就不需要Compute簇等等。
 - 逻辑设备 VkDevice：获取你想要的硬件设备(hardware device)后，就可以通过 VkPhysicalDeviceFeatures 来描述你所需要的显卡特性，像多视图渲染( multi viewport rendering )和使用 64bit 的 float 等，然后根据这些特性创建 VkDevice 逻辑设备。当然，也可以告诉 VkDevice 你想要使用何种队列。Vulkan 中的大多数操作，都是通过提交到 *VkQueue* 来异步执行的。Queue 是从 queue 家族分配的，每个 queue 家族里的 queue 都支持特定的一些操作（这些操作构成一个集合）。例如，有的 queue 家族支持图形操作，有的支持计算操作，有的支持内存转移操作。Queue 家族的能力也可作为选择物理设备条件。可能存在完全不支持图形功能的 Vulkan 设备。
-*** 队列queue的职责是收集命令（命令缓冲区）并将其分派给物理设备执行。一共有4中队列
+- 队列簇QueueFamily，以RTX2080TI为例，该显卡功能强大，是2018民用最强的旗舰款，将它类比CPU的核心(方便理解，原理不一样)，那么该显卡具有多核能力，在Vulkan中它映射为队列。例如：RTX2080TI有16个队列专门用于绘图(Gfx)、8个队列专门用于 计算(Compute)、1个队列(Xfer)用于CPU-GPU-GPU之间的数据传输。Vulkan将这些专有的功能队列称之为簇，每一簇里面又分别有不同数量的队列。
+
+#+ATTR_latex: :width 800
+#+ATTR_HTML: :width 800
+#+ATTR_ORG: :width 800
+[[file:queue_family.png]]
+
+*** 队列queue的职责是收集命令（命令缓冲区）并将其分派给物理设备执行。一共有4种队列
 - graphics：图形
 - compute：计算
 - transfer：传送
