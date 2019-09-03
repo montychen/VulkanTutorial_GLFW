@@ -126,6 +126,7 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS);
             vkGetPhysicalDeviceQueueFamilyProperties; //获取物理设备的 队列属性
 
             vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies.data());  // findQueueFamilies
+
             vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); // 查询能够呈现到窗口surface的队列家族，该函数以物理设备，队列家族索引和surface为参数。
         }
 
@@ -140,19 +141,31 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS);
     }}
 
 {// createLogicalDevice
-    queueCreateInfo.queueFamilyIndex = queueFamily;
-    deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
+    queueCreateInfo.queueFamilyIndex = selected_queuefamily_index;
+    device_createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
-    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-    createInfo.ppEnabledLayerNames = validationLayers.data();
+    device_createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+    device_createInfo.ppEnabledLayerNames = validationLayers.data(); // 推荐使用实例层的验证，Device层的验证已经废弃了。所以这句可以不用。
 
-    vkCreateDevice(gpu, &createInfo, nullptr, &device);  // 队列随着逻辑设备的创建而自动创建
+    vkCreateDevice(gpu, &device_createInfo, nullptr, &device);  // 队列随着逻辑设备的创建而自动创建
 
     vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue); // 用vkGetDeviceQueue函数从队列家族获取队列句柄，并保存在graphicsQueue。因为我们只创建一个队列，用索引0即可。
     vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 }
 
 {// createSwapChain
+    VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
+    VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+
+    swapchain_createInfo.imageFormat = surfaceFormat.format;
+    swapchain_createInfo.imageColorSpace = surfaceFormat.colorSpace;
+    swapchain_createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // imageUsage指明Swap Chain里的image我们拿来做什么，在本例中我们将直接对image进行渲染，这就意味着Image将被当做颜色附件使用(color attachment)。如果你想先渲染一个单独的图片然后再进行处理，那就应该使用VK_IMAGE_USAGE_TRANSFER_DST_BIT并使用内存转换操作将渲染好的image 转换到SwapChain里。
+    swapchain_createInfo.presentMode = presentMode;
+
+
+    vkCreateSwapchainKHR(device, &swapchain_createInfo, nullptr, &swapChain);
+    vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
 }
 #+end_src
 
@@ -175,10 +188,10 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS);
 [[file:queue_family.png]]
 
 *** 队列queue的职责是收集命令（命令缓冲区）并将其分派给物理设备执行。一共有4种队列
-- graphics：图形
-- compute：计算
-- transfer：传送
-- sparse memory management：内存绑定操作，用于更新稀疏资源。
+-       VK_QUEUE_GRAPHICS_BIT：图形
+-        VK_QUEUE_COMPUTE_BIT：计算
+-       VK_QUEUE_TRANSFER_BIT：传送（复制等内存操作）
+- VK_QUEUE_SPARSE_BINDING_BIT：内存绑定操作，用于更新稀疏资源。
   - 在矩阵中，若数值为0的元素远远多于非0元素，并且非0元素分布没有规律时，则称该矩阵为 *稀疏矩阵* ；与之相反，若非0元素占大多数时，则称该矩阵为 *稠密矩阵* 。
   - *稀疏内存* 是一项特殊功能，可让您存储大型图像资源；图像在内存中的存储容量远大于实际的存储容量。 这种技术是将图像分解为图块，并仅加载适合应用程序逻辑的图块。
 
