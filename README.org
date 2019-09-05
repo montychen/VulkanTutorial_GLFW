@@ -107,14 +107,15 @@ vkGetPhysicalDeviceMemoryProperties
 
 * example code
 #+begin_src c++
-// checkValidationLayerSupport
-vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); // 获得所有验证层
+vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data()); // 创建实例前，先获取所有可以用于实例的扩展， 确认所有想要的扩展都是存在的。 然后再在VkInstanceCreateInfo中请求启用。
+vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); //  在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在的， 然后再在VkInstanceCreateInfo中请求启用。
 // getRequiredExtensions
-glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-vkCreateInstance(&createInfo, nullptr, &instance)
+glfwGetRequiredInstanceExtensions(&glfwExtensionCount); //  返回 *实例层* 用来创建surface的扩展列表，不但有基础的 VK_KHR_surface扩展， 还有针对特定操作系统扩展，adnroid是 VK_KHR_android_surface， macOS是 VK_MVK_macos_surface, iOS是 VK_MVK_macos_surface
 
-// createSurface
-glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS);
+vkCreateInstance(&createInfo, nullptr, &instance) //实例层扩展和验证，要在实例创建信息中请求启用。
+
+// createSurface, 创建surface 需要在 instance 被创建后立即被创建，因为它实际上会影响物理设备的选择。
+glfwCreateWindowSurface(instance, window, nullptr, &surface);
 
 {// pickPhysicalDevice
 
@@ -125,12 +126,12 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS);
             vkGetPhysicalDeviceFeatures; // 查询物理设备的特性：纹理压缩、64位浮点数和多视口渲染
             vkGetPhysicalDeviceQueueFamilyProperties; //获取物理设备的 队列属性
 
-            vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies.data());  // findQueueFamilies
-
+            // findQueueFamilies,  为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
+            vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies.data());
             vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); // 查询能够呈现到窗口surface的队列家族，该函数以物理设备，队列家族索引和surface为参数。
         }
 
-        //checkDeviceExtensionSupport
+        //checkDeviceExtensionSupport 获取莫个物理设备的所有 *物理设备扩展* ： 核实是否支持交换链扩展 VK_KHR_swapchain
         vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data());
 
         { // querySwapChainSupport
@@ -144,7 +145,8 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS);
     queueCreateInfo.queueFamilyIndex = selected_queuefamily_index;
     device_createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
-    device_createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+    // 在创建逻辑设备的时候，请求启用交换链扩展 VK_KHR_swapchain
+    device_createInfo.ppEnabledExtensionNames = deviceExtensions.data(); // vector<const char*> deviceExtensions = {  VK_KHR_SWAPCHAIN_EXTENSION_NAME }
     device_createInfo.ppEnabledLayerNames = validationLayers.data(); // 推荐使用实例层的验证，Device层的验证已经废弃了。所以这句可以不用。
 
     vkCreateDevice(gpu, &device_createInfo, nullptr, &device);  // 队列随着逻辑设备的创建而自动创建
@@ -171,6 +173,14 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS);
 
 
 * 初始化过程涉及的对象
+
+扩展和验证层： 包含实例扩展和设备扩展。现在推荐使用实例层验证，设备层验证不推荐使用了。
+- 实例扩展：就是创建实例时将要请求启用的扩展，vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data()) 创建实例前，先获取所有可以用于实例的扩展， 确认所有想要的扩展都是存在的。 然后再在VkInstanceCreateInfo中请求启用。
+
+- 设备扩展：就是在创建逻辑设备时请求启用的扩展。vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data())  在创建逻辑设备前，获取莫个物理设备的所有 *设备扩展* ： 确认我们想在逻辑设备中使用的扩展都是存在的， 比如检查是否支持交换链扩展 VK_KHR_swapchain， 然后再在VkDeviceCreateInfo中请求启用。
+
+- 实例层验证：vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); 在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在的， 然后再在VkInstanceCreateInfo中请求启用。
+
 
 ** 创建一个 VkInstance 对象, 和选择物理设备（VkPhysicalDevice）
 - 物理设备可以简单的将它和GPU硬件对应起来。例如集成显卡对应一个物理设备，独立显卡RTX2080TI对应一个物理设备。那么一台设备上会出现多个GPU硬件，例如：集成显卡Intel(R) HD Graphics 630、独立显卡RTX2080TI、计算卡NVIDIA P106。
@@ -206,7 +216,12 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS);
 - 如果支持交换链，实际上会涉及到三种扩展：两种来源于实例层，一种来源于设备层。
   - 第一种是在实例层定义的 *VK_KHR_surface* 扩展。 它可描述“平面”对象，即应用窗口的逻辑表现形式。 该扩展支持我们查看平面的不同参数（功能、支持的格式、大小），并查询特定物理设备是否支持交换链 （更确切的说，特定队列家族是否支持 在特定平面上演示图像）。 这些信息非常实用，因为我们不想选择物理设备并尝试通过它创建逻辑设备，来了解它是否支持交换链。 该扩展还可定义破环此类平面的方法。
   - 第二种实例层扩展依赖于操作系统：在 Windows中称为 VK_KHR_win32_surface，在Linux中称为 VK_KHR_xlib_surface 或 VK_KHR_xcb_surface。 该扩展支持我们创建在特定操作系统中展现应用窗口 （并使用特定于操作系统的参数）的平面。
-  - *glfwgetrequiredinstanceextensionsll* 函数返回vulkan实例层用来创建surface所需要的 *实例扩展* 列表，不但包含了 VK_KHR_surface扩展， 还包含了针对特定平台的surface扩展，它处理了平台相关的差异。
+  - *glfwgetrequiredinstanceextensionsll* 返回 *实例层* 用来创建surface的扩展列表，不但有基础的 VK_KHR_surface扩展， 还有针对特定操作系统扩展：
+    - Windows中称为 VK_KHR_win32_surface
+    - Linux中称为 VK_KHR_xlib_surface 或 VK_KHR_xcb_surface
+    - adnroid是 VK_KHR_android_surface
+    - macOS是 VK_MVK_macos_surface
+    - iOS是 VK_MVK_macos_surface
 
 
 
