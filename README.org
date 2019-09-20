@@ -110,7 +110,7 @@ vkGetPhysicalDeviceMemoryProperties
 vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data()); // 创建实例前，先获取所有可以用于实例的扩展， 确认所有想要的扩展都是存在的。 然后再在VkInstanceCreateInfo中请求启用。
 vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); //  在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在的， 然后再在VkInstanceCreateInfo中请求启用。
 // getRequiredExtensions
-glfwGetRequiredInstanceExtensions(&glfwExtensionCount); //  返回 *实例层* 用来创建surface的扩展列表，不但有基础的 VK_KHR_surface扩展， 还有针对特定操作系统扩展，adnroid是 VK_KHR_android_surface， macOS是 VK_MVK_macos_surface, iOS是 VK_MVK_macos_surface
+glfwGetRequiredInstanceExtensions(&glfwExtensionCount); //  返回实例层用来创建surface的扩展列表，不但有基础的 VK_KHR_surface扩展， 还有针对特定操作系统扩展， macOS是 VK_MVK_macos_surface
 
 vkCreateInstance(&createInfo, nullptr, &instance) //实例层扩展和验证，要在实例创建信息中请求启用。
 
@@ -174,23 +174,44 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
 
 * 初始化过程涉及的对象
 
-扩展和验证层： 包含实例扩展和设备扩展。现在推荐使用实例层验证，设备层验证不推荐使用了。
-- 实例扩展：就是创建实例时将要请求启用的扩展，vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data()) 创建实例前，先获取所有可以用于实例的扩展， 确认所有想要的扩展都是存在的。 然后再在VkInstanceCreateInfo中请求启用。
-
-- 设备扩展：就是在创建逻辑设备时请求启用的扩展。vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data())  在创建逻辑设备前，获取莫个物理设备的所有 *设备扩展* ： 确认我们想在逻辑设备中使用的扩展都是存在的， 比如检查是否支持交换链扩展 VK_KHR_swapchain， 然后再在VkDeviceCreateInfo中请求启用。
+** 创建实例前，先确认所有想要的实例层扩展和验证是否都存在
+扩展有2类，实例层扩展和逻辑设备扩展。现在推荐使用实例层验证，逻辑设备层验证不推荐使用了。
+- 实例扩展：就是创建实例时将要请求启用的扩展
+  - vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data()) 创建实例前，先获取所有可以用于实例的扩展， 确认所有想要的扩展都是存在的。 然后再在VkInstanceCreateInfo中请求启用。
+  - 如果在macOS、Win系统上，使用glfwGetRequiredInstanceExtensions(&glfwExtensionCount) 可以方便的返回实例层用来创建surface所需要的扩展列表，不但有基础的VK_KHR_surface扩展， 还有针对特定操作系统的扩展，macOS是 VK_MVK_macos_surface
 
 - 实例层验证：vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); 在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在的， 然后再在VkInstanceCreateInfo中请求启用。
+#+begin_src c++
+vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+glfwGetRequiredInstanceExtensions(&glfwExtensionCount); // 如果在macOS、Win系统上，这个方法可以方便的返回实例层用来创建surface所需要的扩展列表，不但有基础的VK_KHR_surface扩展， 还有针对特定操作系统的扩展，macOS是 VK_MVK_macos_surface
+vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); //  在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在的， 然后再在VkInstanceCreateInfo中请求启用。
+#+end_src
 
+** 创建一个 VkInstance 对象
+- 物理设备可以简单的将它和GPU硬件对应起来。例如集成显卡对应一个物理设备，独立显卡RTX2080TI对应一个物理设备。一台电脑上经常有多个GPU硬件，例如：集成显卡Intel(R) HD Graphics 630、独立显卡RTX2080TI、计算卡NVIDIA P106。
+#+begin_src c++
+vkCreateInstance(&createInfo, nullptr, &instance) // 创建实例，实例层扩展和验证，要在VkInstanceCreateInfo实例创建信息中请求启用。
+#+end_src
 
-** 创建一个 VkInstance 对象, 和选择物理设备（VkPhysicalDevice）
-- 物理设备可以简单的将它和GPU硬件对应起来。例如集成显卡对应一个物理设备，独立显卡RTX2080TI对应一个物理设备。那么一台设备上会出现多个GPU硬件，例如：集成显卡Intel(R) HD Graphics 630、独立显卡RTX2080TI、计算卡NVIDIA P106。
-- VkInstance: 创建完 instance 后，你可以获取支持 Vulkan 的可用硬件，然后从中选取一个或多个物理设备 VkPhysicalDevice 来使用。每个物理设备，你都可以获取它的属性 vkGetPhysicalDeviceProperties，和特性 vkGetPhysicalDeviceFeatures。一个 VkInstance 可以对应多个 VkPhysicalDevice，一个 VkPhysicalDevice 也可以创建多个逻辑设备 VkDevice。目前跨 GPU 的调用还未实现。
-- 基于逻辑设备的验证层已经废弃， 现在推荐在实例上启用验证validation layer。
+** 创建平面surface, 需要在instance被创建后立即被创建，因为这个surface会作为下面判定莫个物理设备是否合适的一个条件
+#+begin_src c++
+glfwCreateWindowSurface(instance, window, nullptr, &surface);
+#+end_src
 
+** 选择物理设备（VkPhysicalDevice）
+- 创建完 instance 后，你可以获取支持 Vulkan 的可用硬件，然后从中选取一个或多个物理设备 VkPhysicalDevice 来使用。每个物理设备，你都可以获取它的属性 vkGetPhysicalDeviceProperties，和特性 vkGetPhysicalDeviceFeatures。一个 VkInstance 可以对应多个 VkPhysicalDevice，一个 VkPhysicalDevice 也可以创建多个逻辑设备 VkDevice。目前跨 GPU 的调用还未实现。
+#+begin_src c++
+
+vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
+#+end_src
+
+ 
 ** 逻辑设备 VkDevice 和 VkQueue 。
 - 为什么需要创建逻辑设备，不直接使用物理设备。 因为大多数时候我们并不需要物理设备的全部功能，在不同的场景下，只会开启其中的部分功能。比如在挖矿、视频解压等这种情况下就不需要渲染簇；只需要画面显示的应用就不需要Compute簇等等。
 - 逻辑设备 VkDevice：获取你想要的硬件设备(hardware device)后，就可以通过 VkPhysicalDeviceFeatures 来描述你所需要的显卡特性，像多视图渲染( multi viewport rendering )和使用 64bit 的 float 等，然后根据这些特性创建 VkDevice 逻辑设备。当然，也可以告诉 VkDevice 你想要使用何种队列。Vulkan 中的大多数操作，都是通过提交到 *VkQueue* 来异步执行的。Queue 是从 queue 家族分配的，每个 queue 家族里的 queue 都支持特定的一些操作（这些操作构成一个集合）。例如，有的 queue 家族支持图形操作，有的支持计算操作，有的支持内存转移操作。Queue 家族的能力也可作为选择物理设备条件。可能存在完全不支持图形功能的 Vulkan 设备。
 - 队列簇QueueFamily，以RTX2080TI为例，该显卡功能强大，是2018民用最强的旗舰款，将它类比CPU的核心(方便理解，原理不一样)，那么该显卡具有多核能力，在Vulkan中它映射为队列。例如：RTX2080TI有16个队列专门用于绘图(Gfx)、8个队列专门用于 计算(Compute)、1个队列(Xfer)用于CPU-GPU-GPU之间的数据传输。Vulkan将这些专有的功能队列称之为簇，每一簇里面又分别有不同数量的队列。
+- 逻辑设备扩展：就是在创建逻辑设备时请求启用的扩展。vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data())  在创建逻辑设备前，获取莫个物理设备的所有 *设备扩展* ： 确认我们想在逻辑设备中使用的扩展都是存在的， 比如检查是否支持交换链扩展 VK_KHR_swapchain， 然后再在VkDeviceCreateInfo中请求启用。
+
 
 #+ATTR_latex: :width 800
 #+ATTR_HTML: :width 800
