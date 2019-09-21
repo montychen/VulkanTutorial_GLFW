@@ -124,14 +124,14 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
         {
             vkGetPhysicalDeviceProperties; // 查询物理设备的属性：支持的Vulkan API版本、设备名称和类型（集成或专用/独立GPU）、厂商ID和限制。
             vkGetPhysicalDeviceFeatures; // 查询物理设备的特性：纹理压缩、64位浮点数和多视口渲染
-            vkGetPhysicalDeviceQueueFamilyProperties; //获取物理设备的 队列属性
 
             // findQueueFamilies,  为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
-            vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies.data());
-            vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); // 查询能够呈现到窗口surface的队列家族，该函数以物理设备，队列家族索引和surface为参数。
+            vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies.data());  //获取物理设备的 队列属性
+            if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT);  // 现在我们将只查找支持图形命令的队列
+            vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); // 以某个物理设备，的某个队列家族索引和surface为参数。 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
         }
 
-        //checkDeviceExtensionSupport 获取莫个物理设备的所有 *物理设备扩展* ： 核实是否支持交换链扩展 VK_KHR_swapchain
+        //checkDeviceExtensionSupport 获取莫个物理设备的所有 *逻辑设备扩展* ： 核实是否支持交换链扩展 VK_KHR_swapchain， 在接下来的将要创建的逻辑设备中是否可用。
         vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data());
 
         { // querySwapChainSupport
@@ -195,14 +195,38 @@ vkCreateInstance(&createInfo, nullptr, &instance) // 创建实例，实例层扩
 
 ** 创建平面surface, 需要在instance被创建后立即被创建，因为这个surface会作为下面判定莫个物理设备是否合适的一个条件
 #+begin_src c++
-glfwCreateWindowSurface(instance, window, nullptr, &surface);
+// 下面的这个函数 vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); 以某个物理设备，的某个队列家族索引和这个surface为参数。 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
+glfwCreateWindowSurface(instance, window, nullptr, &surface); // 创建surface
 #+end_src
 
 ** 选择物理设备（VkPhysicalDevice）
-- 创建完 instance 后，你可以获取支持 Vulkan 的可用硬件，然后从中选取一个或多个物理设备 VkPhysicalDevice 来使用。每个物理设备，你都可以获取它的属性 vkGetPhysicalDeviceProperties，和特性 vkGetPhysicalDeviceFeatures。一个 VkInstance 可以对应多个 VkPhysicalDevice，一个 VkPhysicalDevice 也可以创建多个逻辑设备 VkDevice。目前跨 GPU 的调用还未实现。
-#+begin_src c++
+- 创建完 instance 后，你可以枚举GPU硬件，从中选取一个或多个物理设备VkPhysicalDevice来使用。一个VkInstance可以有多个VkPhysicalDevice，一个VkPhysicalDevice可以创建多个逻辑设备VkDevice。目前跨GPU的调用还未实现。
+- 选取合适的物理设备， 主要是看某个gup的队列簇QueueFamily是否满足要求，比如，为了要在窗口中显示图片，队列就需要同时满足：绘制和显示。交换链扩展在逻辑设备中可用。
+  - 支持绘制，也就是：queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT
+  - 是否支持图片显示：vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); 可以判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
 
+#+begin_src c++
 vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
+{ // isDeviceSuitable
+    {
+        vkGetPhysicalDeviceProperties; // 查询物理设备的属性：支持的Vulkan API版本、设备名称和类型（集成或专用/独立GPU）、厂商ID和限制。
+        vkGetPhysicalDeviceFeatures; // 查询物理设备的特性：纹理压缩、64位浮点数和多视口渲染
+
+        // findQueueFamilies,  为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
+        vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies.data());  //获取物理设备的 队列属性
+        if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT);  // 现在我们将只查找支持图形命令的队列
+        vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); // 以某个物理设备，的某个队列家族索引和surface为参数。 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
+
+        //checkDeviceExtensionSupport 获取莫个物理设备的所有 *逻辑设备扩展* ： 核实是否支持交换链扩展 VK_KHR_swapchain， 在接下来的将要创建的逻辑设备中是否可用。
+        vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data());
+
+        { // querySwapChainSupport
+            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
+            vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素格式，颜色空间）
+            vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式
+        }
+    }
+
 #+end_src
 
  
@@ -210,7 +234,7 @@ vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
 - 为什么需要创建逻辑设备，不直接使用物理设备。 因为大多数时候我们并不需要物理设备的全部功能，在不同的场景下，只会开启其中的部分功能。比如在挖矿、视频解压等这种情况下就不需要渲染簇；只需要画面显示的应用就不需要Compute簇等等。
 - 逻辑设备 VkDevice：获取你想要的硬件设备(hardware device)后，就可以通过 VkPhysicalDeviceFeatures 来描述你所需要的显卡特性，像多视图渲染( multi viewport rendering )和使用 64bit 的 float 等，然后根据这些特性创建 VkDevice 逻辑设备。当然，也可以告诉 VkDevice 你想要使用何种队列。Vulkan 中的大多数操作，都是通过提交到 *VkQueue* 来异步执行的。Queue 是从 queue 家族分配的，每个 queue 家族里的 queue 都支持特定的一些操作（这些操作构成一个集合）。例如，有的 queue 家族支持图形操作，有的支持计算操作，有的支持内存转移操作。Queue 家族的能力也可作为选择物理设备条件。可能存在完全不支持图形功能的 Vulkan 设备。
 - 队列簇QueueFamily，以RTX2080TI为例，该显卡功能强大，是2018民用最强的旗舰款，将它类比CPU的核心(方便理解，原理不一样)，那么该显卡具有多核能力，在Vulkan中它映射为队列。例如：RTX2080TI有16个队列专门用于绘图(Gfx)、8个队列专门用于 计算(Compute)、1个队列(Xfer)用于CPU-GPU-GPU之间的数据传输。Vulkan将这些专有的功能队列称之为簇，每一簇里面又分别有不同数量的队列。
-- 逻辑设备扩展：就是在创建逻辑设备时请求启用的扩展。vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data())  在创建逻辑设备前，获取莫个物理设备的所有 *设备扩展* ： 确认我们想在逻辑设备中使用的扩展都是存在的， 比如检查是否支持交换链扩展 VK_KHR_swapchain， 然后再在VkDeviceCreateInfo中请求启用。
+- 逻辑设备扩展：就是在创建逻辑设备时请求启用的扩展。vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data())  在创建逻辑设备前，获取莫个物理设备的所有 *逻辑设备扩展* ： 确认我们想在逻辑设备中使用的扩展都是存在的， 比如检查是否支持交换链扩展 VK_KHR_swapchain， 然后再在VkDeviceCreateInfo中请求启用。
 
 
 #+ATTR_latex: :width 800
