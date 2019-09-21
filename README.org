@@ -201,7 +201,7 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface); // 创建surface
 
 ** 选择物理设备（VkPhysicalDevice）
 - 创建完 instance 后，你可以枚举GPU硬件，从中选取一个或多个物理设备VkPhysicalDevice来使用。一个VkInstance可以有多个VkPhysicalDevice，一个VkPhysicalDevice可以创建多个逻辑设备VkDevice。目前跨GPU的调用还未实现。
-- 选取合适的物理设备， 主要是看某个gup的队列簇QueueFamily是否满足要求，比如，为了要在窗口中显示图片，队列就需要同时满足：绘制和显示。交换链扩展在逻辑设备中可用。
+- 选取合适的物理设备， 主要是看某个gup的队列簇QueueFamily是否满足要求，比如，为了要在窗口中显示图片，队列就要支持绘制和显示 + 逻辑设备也要支持交换链扩展
   - 支持绘制，也就是：queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT
   - 是否支持图片显示：vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); 可以判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
 
