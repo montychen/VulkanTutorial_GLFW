@@ -108,6 +108,7 @@ vkGetPhysicalDeviceMemoryProperties
 * example code
 #+begin_src c++
 vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data()); // 创建实例前，先获取所有可以用于实例的扩展， 确认所有想要的扩展都是存在的。 然后再在VkInstanceCreateInfo中请求启用。
+// 最常用的实例层验证是：VK_LAYER_KHRONOS_validation，检查看看它是否存在，它是一个大的验证层集合，系统把所有标准常用的验证层，都融合在一起。
 vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); //  在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在的， 然后再在VkInstanceCreateInfo中请求启用。
 // getRequiredExtensions
 glfwGetRequiredInstanceExtensions(&glfwExtensionCount); //  返回实例层用来创建surface的扩展列表，不但有基础的 VK_KHR_surface扩展， 还有针对特定操作系统扩展， macOS是 VK_MVK_macos_surface
@@ -181,6 +182,7 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
   - 如果在macOS、Win系统上，使用glfwGetRequiredInstanceExtensions(&glfwExtensionCount) 可以方便的返回实例层用来创建surface所需要的扩展列表，不但有基础的VK_KHR_surface扩展， 还有针对特定操作系统的扩展，macOS是 VK_MVK_macos_surface
 
 - 实例层验证：vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); 在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在的， 然后再在VkInstanceCreateInfo中请求启用。
+  - 最常用的实例层验证是：VK_LAYER_KHRONOS_validation，检查看看它是否存在，它是一个大的验证层集合，系统把所有标准常用的验证层，都融合在一起。
 #+begin_src c++
 vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 glfwGetRequiredInstanceExtensions(&glfwExtensionCount); // 如果在macOS、Win系统上，这个方法可以方便的返回实例层用来创建surface所需要的扩展列表，不但有基础的VK_KHR_surface扩展， 还有针对特定操作系统的扩展，macOS是 VK_MVK_macos_surface
@@ -200,8 +202,8 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface); // 创建surface
 #+end_src
 
 ** 选择物理设备（VkPhysicalDevice）
-- 创建完 instance 后，你可以枚举GPU硬件，从中选取一个或多个物理设备VkPhysicalDevice来使用。一个VkInstance可以有多个VkPhysicalDevice，一个VkPhysicalDevice可以创建多个逻辑设备VkDevice。目前跨GPU的调用还未实现。
-- 队列簇QueueFamily，以RTX2080TI为例，该显卡功能强大，是2018民用最强的旗舰款，将它类比CPU的核心(方便理解，原理不一样)，那么该显卡具有多核能力，在Vulkan中它映射为队列。例如：RTX2080TI有16个队列专门用于绘图(Gfx)、8个队列专门用于 计算(Compute)、1个队列(Xfer)用于CPU-GPU-GPU之间的数据传输。Vulkan将这些专有的功能队列称之为簇，每一簇里面又分别有不同数量的队列。Vulkan中的操作最终都是提交到 *VkQueue* 来异步执行的，Queue从queue家族中分配.
+- 创建完 instance 后，你可以枚举GPU硬件，从中选取一个或多个物理设备VkPhysicalDevice来使用。一个VkInstance可以有多个VkPhysicalDevice， 一个VkPhysicalDevice可以创建多个逻辑设备VkDevice。目前跨GPU的调用还未实现。
+- 队列簇QueueFamily，以RTX2080TI为例，该显卡功能强大，是2018民用最强的旗舰款，将它类比CPU的核心(方便理解，原理不一样)， 那么该显卡具有多核能力，在Vulkan中它映射为队列。例如：RTX2080TI有16个队列专门用于绘图(Gfx)、8个队列专门用于 计算(Compute)、1个队列(Xfer)用于CPU-GPU-GPU 之间的数据传输。Vulkan将这些专有的功能队列称之为簇， 每一簇里面又分别有不同数量的队列。Vulkan中的操作最终都是提交到Queue来异步执行的， 队列从QueueFamily中分配.
 - 选取合适的物理设备， 主要是看某个gup的队列簇QueueFamily是否满足要求，比如，为了要在窗口中显示图片，队列就要支持绘制和显示 + 逻辑设备也要支持交换链扩展
   - 支持绘制，也就是：queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT
   - 是否支持图片显示：vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); 可以判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
