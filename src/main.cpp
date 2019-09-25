@@ -55,7 +55,7 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
 
 
 struct QueueFamilyIndices {
-    std::optional<uint32_t> graphicsFamily; // 有的设备支持绘制命令 drawing commands， 不代表就一定支持呈现，也就是将image呈现到我们创建的surface窗口上。
+    std::optional<uint32_t> graphicsFamily; // 有的设备支持绘制命令 drawing commands， 不代表就一定支持呈现，也就是将image呈现present到我们创建的surface窗口上。
     std::optional<uint32_t> presentFamily;	// 所以需要把支持呈现presentation作为选取设备时的一个条件。presentation是个队列相关的特性，这个问题实际上是要找到一个队列家族，其支持呈现到我们创建的surface。
 
     bool isComplete() {
@@ -67,7 +67,7 @@ struct QueueFamilyIndices {
 // 仅仅检查交换链是否可用，不够充分，因为它可能和窗口surface不兼容。我们还需要检查这3个属性
 struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;	 // 基础surface功能（交换链包含的image的最大\小数量，image的宽高的最大\最小值）
-    std::vector<VkSurfaceFormatKHR> formats; // Surface格式（像素格式，颜色空间）
+    std::vector<VkSurfaceFormatKHR> formats; // Surface格式, 包含format和colorSpace成员变量。format指定颜色通道和存储类型, colorSpace用来表示SRGB颜色空间是否被支持
     std::vector<VkPresentModeKHR> presentModes; // 可用的presentation模式
 };
 
@@ -291,6 +291,7 @@ private:
         VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
         VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
 
+        // VkSurfaceCapabilitiesKHR包含交换链进行渲染时允许的最大最小的image图像数量， image的宽高的最大/最小值
         uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1; // 交换链中要有多少个image。简单地使用最小值，在请求另一个image渲染前，可能有时候不得不等待driver完成内部操作。因此推荐至少比最小值多1
         if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) { // 确保不超过image的最大值，而0是个特殊值，意思没限制。
             imageCount = swapChainSupport.capabilities.maxImageCount;
@@ -300,7 +301,7 @@ private:
         createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
         createInfo.surface = surface;
 
-        createInfo.minImageCount = imageCount;
+        createInfo.minImageCount = imageCount; // 在交换链允许的范围内，请求交换链至少需要提供多少个image
         createInfo.imageFormat = surfaceFormat.format;
         createInfo.imageColorSpace = surfaceFormat.colorSpace;
         createInfo.imageExtent = extent;
@@ -341,9 +342,9 @@ private:
 
 
     VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
-        for (const auto& availableFormat : availableFormats) {
+        for (const auto& availableFormat : availableFormats) { // VK_FORMAT_B8G8R8A8_UNORM表示以B，G，R和A的顺序，每个颜色通道用8位无符号整型数表示，总共每像素使用32位表示
             if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-                return availableFormat;
+                return availableFormat; // 对于颜色空间，如果SRGB被支持，就使用SRGB，可以获得更加准确的颜色表示。直接用SRGB有很大挑战，所以使用RGB作为颜色格式，这一格式可以通过VK_FORMAT_B8G8R8A8_UNORM指定。
             }
         }
 
@@ -464,7 +465,7 @@ private:
             }
 
             VkBool32 presentSupport = false;
-            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport); // 查询能够呈现到窗口surface的队列家族，该函数以物理设备，队列家族索引和surface为参数。
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport); // 该函数以物理设备，队列家族索引和surface为参数。 查看特定物理设备的特定队列家族是否支持交换链，或更准确地说， 是否支持在特定平面上显 示present 图像。 如果支持，presentSupport的值会被设为VK_TRUE.  因此我们才需要提前创建平面。 有的设备支持 绘制命令 drawing commands， 不代表就一定支持呈现，也就是将image呈现present到我们创建的surface窗口上。
 
             if (queueFamily.queueCount > 0 && presentSupport) {
                 indices.presentFamily = i; // 支持绘制和呈现的队列不一定是同一个。 可以考虑添加一段逻辑来显式地选择一个物理设备，其在同一队列中同时支持绘制和presentation，以获得更好的性能。
@@ -485,10 +486,9 @@ private:
     std::vector<const char*> getRequiredExtensions() {
         uint32_t glfwExtensionCount = 0;
         const char** glfwExtensions;
-        // Vulkan是平台无关的，它不能直接与平台窗体系统通信，为了连接Vulkan和窗体系统,使得被渲染后的结果显示到屏幕上，
-        // 我们需要使用WSI扩展(Window System Integration extensions), 这里我们将使用VK_KHR_surface。
-        // VK_KHR_surface扩展是一个instance级的扩展，它包含在glfwGetRequiredInstanceExtensions返回的列表中。该列表还包括一些其他WSI扩展.
-        // 参数glfwExtensionCount返回实例扩展的数量。函数返回值glfwExtensions是实例扩展的名称数组。
+        //  返回 *实例层* 用来创建surface的扩展列表，不但有基础的 VK_KHR_surface扩展， 还有针对特定操作系统扩展，
+        //  在 Windows中称为 VK_KHR_win32_surface，在Linux中称为 VK_KHR_xlib_surface 或 VK_KHR_xcb_surface。
+        //  参数glfwExtensionCount返回实例扩展的数量。函数返回值glfwExtensions是实例扩展的名称数组。
         glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
         // 用glfwExtensions的第0...glfwExtensionCount-1个元素来初始化。类似vector<int> tmp(vec.begin(), vec.begin() + 3) 用向量vec的第0个到第2个值初始化tmp
@@ -542,14 +542,14 @@ private:
 };
 
 int main() {
-	HelloTriangleApplication app;
+    HelloTriangleApplication app;
 
-	try {
-		app.run();
-	} catch (const std::exception& e) {
-		std::cerr << e.what() << std::endl;
-		return EXIT_FAILURE;
-	}
+    try {
+        app.run();
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
 
-	return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
 }
