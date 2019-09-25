@@ -108,14 +108,14 @@ vkGetPhysicalDeviceMemoryProperties
 * example code
 #+begin_src c++
 vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data()); // 创建实例前，先获取所有可以用于实例的扩展， 确认所有想要的扩展都是存在的。 然后再在VkInstanceCreateInfo中请求启用。
-vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); //  在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在 的， 然后再在VkInstanceCreateInfo中请求启用。 最常用的实例层验证是：VK_LAYER_KHRONOS_validation， 检查看看它是否存在， 它是一个大的验证层集合， 系统把所 有标准常用的验证层都融合在一起。
+vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); // 创建实例前，获得所有可用实例层的验证, 确认所有想要的验证都是存在的， 再在VkInstanceCreateInfo中请求启用。 常用的是：VK_LAYER_KHRONOS_validation， 检查看看它是否存在， 它是一个大的验证层集合， 系统把所 有标准常用的验证层都融合在一起。
 
 // getRequiredExtensions
 glfwGetRequiredInstanceExtensions(&glfwExtensionCount); //  返回实例层用来创建surface的扩展列表，不但有基础的 VK_KHR_surface扩展， 还有针对特定操作系统扩展， macOS是 VK_MVK_macos_surface
 
-vkCreateDebugUtilsMessengerEXT // 启用 VK_LAYER_KHRONOS_validation 验证层后，要定义一个用来接收消息的回调函数 debugCallback。同时为了接收消息，我们还要启用实例 VK_EXT_debug_utils 扩展。
 instance_createInfo.ppEnabledExtensionNames = extensions.data(); // 包含3个扩展 VK_KHR_surface, VK_MVK_macos_surface,  VK_EXT_debug_utils
 instance_createInfo.ppEnabledLayerNames = validationLayers.data(); // 常用的是这个扩展：VK_LAYER_KHRONOS_validation, 它是一个大的验证层集合，系统把所有标准常用的验证层，都融合在一起。
+vkCreateDebugUtilsMessengerEXT // VK_LAYER_KHRONOS_validation默认在终端输出所有验证层的调试信息。启用实例扩展 VK_EXT_debug_utils后，我们可以自己定义一个回调函数，输出我们感兴趣的信息。
 populateDebugMessengerCreateInfo(debugmsg_CreateInfo);  // 设置接收消息的回调函数pfnUserCallback，要输出的信息类型：warning, error...触发回调的事件类型：validation, performance...
 instance_createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugmsg_CreateInfo;
 vkCreateInstance(&instance_createInfo, nullptr, &instance) //实例层扩展和验证，要在实例创建信息中请求启用。
@@ -187,7 +187,8 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
   - 如果在macOS、Win系统上，使用glfwGetRequiredInstanceExtensions(&glfwExtensionCount) 可以方便的返回实例层用来创建surface所需要的扩展列表，不但有基础的VK_KHR_surface扩展， 还有针对特定操作系统的扩展，macOS是 VK_MVK_macos_surface
 
 - 实例层验证：vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); 在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在的， 然后再在VkInstanceCreateInfo中请求启用。
-  - 最常用的实例层验证是：VK_LAYER_KHRONOS_validation，检查看看它是否存在，它是一个大的验证层集合，系统把所有标准常用的验证层，都融合在一起。启用 VK_LAYER_KHRONOS_validation 验证层后，要定义一个用来接收消息的回调函数 debugCallback。同时为了接收消息，我们还要启用 VK_EXT_debug_utils 实例扩展。
+  - 实例层验证的作用：函数调用传递的参数是否符合规范、对象的创建和销毁是否有内存泄露、线程是否安全、记录每个函数调用并在标准设备上输出、分析函数调用和重播
+  - 最常用的实例层验证是：VK_LAYER_KHRONOS_validation，它是一个大的验证层集合，系统把所有标准常用的验证层都融合在一起。VK_LAYER_KHRONOS_validation默认在终端输出所有验证层的调试信息。启用实例扩展 VK_EXT_debug_utils后， 我们可以自己定义一个回调函数，输出我们感兴趣的信息。
 #+begin_src c++
 vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 glfwGetRequiredInstanceExtensions(&glfwExtensionCount); // 如果在macOS、Win系统上，这个方法可以方便的返回实例层用来创建surface所需要的扩展列表，不但有基础的VK_KHR_surface扩展， 还有针对特定操作系统的扩展，macOS是 VK_MVK_macos_surface
