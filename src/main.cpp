@@ -494,7 +494,7 @@ private:
         // 用glfwExtensions的第0...glfwExtensionCount-1个元素来初始化。类似vector<int> tmp(vec.begin(), vec.begin() + 3) 用向量vec的第0个到第2个值初始化tmp
         std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
-        // 仅仅启用验证层，并没什么用，因为现在还没办法将调试消息转回给程序。为了接收消息，我们不得不用回调设置一个debug信使，这就要使用VK_EXT_debug_utils 扩展。
+        // VK_LAYER_KHRONOS_validation默认在终端输出所有验证层的调试信息。启用实例扩展 VK_EXT_debug_utils后，我们可以自己定义一个回调函数，输出我们感兴趣的信息。
         if (enableValidationLayers) {
             extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);  // 注意，这里用的是VK_EXT_DEBUG_UTILS_EXTENSION_NAME宏，等于字符串"VK_EXT_debug_utils"
         }
@@ -528,7 +528,9 @@ private:
         return true;
     }
 
-    // 启用验证层后，定义一个用来接收消息的回调函数debugCallback，以PFN_vkDebugUtilsMessengerCallbackEXT 为原型。VKAPI_ATTR和VKAPI_CALL确保函数有正确的签名
+
+    // VK_LAYER_KHRONOS_validation默认在终端输出所有验证层的调试信息。启用实例扩展 VK_EXT_debug_utils后，我们可以自己定义一个回调函数，输出我们感兴趣的信息。
+    // 定义一个用来接收消息的回调函数debugCallback，以PFN_vkDebugUtilsMessengerCallbackEXT 为原型。VKAPI_ATTR和VKAPI_CALL确保函数有正确的签名
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,  // 消息的严重性如：VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT, INFO, WARNING, ERROR等。
         VkDebugUtilsMessageTypeFlagsEXT messageType,             // 消息类型，如：VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT 表示和性能有关。
