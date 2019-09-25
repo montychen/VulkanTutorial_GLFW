@@ -79,7 +79,7 @@ make   #编译
 * Vulkan 初始化流程 ：
 
 1) vkCreateInstance()： VkInstanceCreateInfo +  VkApplicationInfo  创建实例
-2) vkCreateDebugUtilsMessengerEXT：启用 VK_LAYER_KHRONOS_validation 验证层后，要定义一个用来接收消息的回调函数 debugCallback。同时为了接收消息，我们还要启用实例 VK_EXT_debug_utils 扩展。
+2) vkCreateDebugUtilsMessengerEXT：VK_LAYER_KHRONOS_validation默认在终端输出所有验证层的调试信息。启用实例扩展VK_EXT_debug_utils后， 自定义一个回调函数，输出我们感兴趣的信息。
 3) glfwCreateWindowSurface：窗口 surface 需要在 instance 被创建后立即被创建，因为它实际上会影响物理设备的选择。
 
 4) vkEnumeratePhysicalDevices() -> vkGetPhysicalDeviceQueueFamilyProperties() 根据合适的队列簇，选择物理设备, 为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
@@ -194,10 +194,17 @@ vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data
 glfwGetRequiredInstanceExtensions(&glfwExtensionCount); // 如果在macOS、Win系统上，这个方法可以方便的返回实例层用来创建surface所需要的扩展列表，不但有基础的VK_KHR_surface扩展， 还有针对特定操作系统的扩展，macOS是 VK_MVK_macos_surface
 vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); //  在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在的， 然后再在VkInstanceCreateInfo中请求启用。
 #+end_src
-
 ** 创建一个 VkInstance 对象
 - 物理设备可以简单的将它和GPU硬件对应起来。例如集成显卡对应一个物理设备，独立显卡RTX2080TI对应一个物理设备。一台电脑上经常有多个GPU硬件，例如：集成显卡Intel(R) HD Graphics 630、独立显卡RTX2080TI、计算卡NVIDIA P106。
 #+begin_src c++
+// 实例层验证VK_LAYER_KHRONOS_validation默认在终端输出所有验证信息。可以启用实例扩展VK_EXT_debug_utils，然后自定义一个回调函数，就可只输出我们感兴趣的信息。
+instance_createInfo.ppEnabledExtensionNames = extensions.data(); // 包含3个扩展 VK_KHR_surface, VK_MVK_macos_surface,  VK_EXT_debug_utils
+instance_createInfo.ppEnabledLayerNames = validationLayers.data(); // VK_LAYER_KHRONOS_validation, 它是一个大的验证层集合，系统把所有标准常用的验证层，都融合在一起。
+
+populateDebugMessengerCreateInfo(debugmsg_CreateInfo);  // 设置接收消息的回调函数pfnUserCallback，要输出的信息类型：warning, error...触发回调的事件类型：validation, performance...
+instance_createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugmsg_CreateInfo;
+VkDebugUtilsMessengerEXT debugMessenger; // 函数vkCreateDebugUtilsMessengerEXT(instance, debugmsg_CreateInfo...) 生成VkDebugUtilsMessengerEXT的实例。
+
 vkCreateInstance(&createInfo, nullptr, &instance) // 创建实例，实例层扩展和验证，要在VkInstanceCreateInfo实例创建信息中请求启用。
 #+end_src
 
