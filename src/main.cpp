@@ -262,7 +262,7 @@ private:
         createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()); // 不同队列家族的数量，我们通过它创建队列和设备。
         createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
-        createInfo.pEnabledFeatures = &deviceFeatures;
+        createInfo.pEnabledFeatures = &deviceFeatures; // 希望启用的 vkGetPhysicalDeviceFeatures 特性， 比如几何着色器。
 
         createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
         createInfo.ppEnabledExtensionNames = deviceExtensions.data();
@@ -447,7 +447,7 @@ private:
     }
 
     // vkGetPhysicalDeviceProperties： 属性包含的字段有：支持的Vulkan API版本、设备名称和类型（集成或专用/独立GPU）、厂商ID和限制。
-    // vkGetPhysicalDeviceFeatures：获取物理设备的可选特性，如：纹理压缩、64位浮点数和多视口渲染
+    // vkGetPhysicalDeviceFeatures：获取物理设备的可选特性，如：是否支持geometryShaderh或者tessellationShader，纹理压缩、64位浮点数和多视口渲染
     // vkGetPhysicalDeviceQueueFamilyProperties: 获取物理设备的 队列属性
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
         QueueFamilyIndices indices;

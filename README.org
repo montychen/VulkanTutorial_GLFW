@@ -113,12 +113,13 @@ vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); // 创�
 // getRequiredExtensions
 glfwGetRequiredInstanceExtensions(&glfwExtensionCount); //  返回实例层用来创建surface的扩展列表，不但有基础的 VK_KHR_surface扩展， 还有针对特定操作系统扩展， macOS是 VK_MVK_macos_surface
 
+// 实例层验证VK_LAYER_KHRONOS_validation默认在终端输出所有验证信息。可以启用实例扩展VK_EXT_debug_utils，然后自定义一个回调函数，就可只输出我们感兴趣的信息。
 instance_createInfo.ppEnabledExtensionNames = extensions.data(); // 包含3个扩展 VK_KHR_surface, VK_MVK_macos_surface,  VK_EXT_debug_utils
-instance_createInfo.ppEnabledLayerNames = validationLayers.data(); // 常用的是这个扩展：VK_LAYER_KHRONOS_validation, 它是一个大的验证层集合，系统把所有标准常用的验证层，都融合在一起。
-vkCreateDebugUtilsMessengerEXT // VK_LAYER_KHRONOS_validation默认在终端输出所有验证层的调试信息。启用实例扩展 VK_EXT_debug_utils后，我们可以自己定义一个回调函数，输出我们感兴趣的信息。
+instance_createInfo.ppEnabledLayerNames = validationLayers.data(); // VK_LAYER_KHRONOS_validation, 它是一个大的验证层集合，系统把所有标准常用的验证层，都融合在一起。
 populateDebugMessengerCreateInfo(debugmsg_CreateInfo);  // 设置接收消息的回调函数pfnUserCallback，要输出的信息类型：warning, error...触发回调的事件类型：validation, performance...
-instance_createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugmsg_CreateInfo;
-vkCreateInstance(&instance_createInfo, nullptr, &instance) //实例层扩展和验证，要在实例创建信息中请求启用。
+instance_createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugmsg_CreateInfo; // 把pNext设为debugmsg_CreateInfo，vkCreateDebugUtilsMessengerEXT和 vkDestroyDebugUtilsMessengerEXT 就可共用下面的debugMessenger实例。
+VkDebugUtilsMessengerEXT debugMessenger; // 通过函数vkCreateDebugUtilsMessengerEXT(instance, debugmsg_CreateInfo...) 生成VkDebugUtilsMessengerEXT的实例。
+vkCreateInstance(&createInfo, nullptr, &instance) // 创建实例，实例层扩展和验证，要在VkInstanceCreateInfo实例创建信息中请求启用。
 
 // createSurface, 创建surface 需要在 instance 被创建后立即被创建，因为它实际上会影响物理设备的选择。
 glfwCreateWindowSurface(instance, window, nullptr, &surface);
@@ -128,8 +129,9 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
     vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
     { // isDeviceSuitable
         {
-            vkGetPhysicalDeviceProperties; // 查询物理设备的属性：支持的Vulkan API版本、设备名称和类型（集成或专用/独立GPU）、厂商ID和限制。
-            vkGetPhysicalDeviceFeatures; // 查询物理设备的特性：纹理压缩、64位浮点数和多视口渲染
+            vkGetPhysicalDeviceProperties(gup, &gpuProperties); // 查询物理设备的属性：支持的Vulkan API版本、设备名称和类型（集成或专用/独立GPU）、厂商ID和限制。
+            vkGetPhysicalDeviceFeatures(gpu, &gpuFeatures); // 获取物理设备的可选特性，如：是否支持geometryShaderh或者tessellationShader，纹理压缩、64位浮点数和多视口渲染
+            if(gpuProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && gpuFeatures.geometryShader);  // 是否独立显卡和支持几何着色器
 
             // findQueueFamilies,  为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
             vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies.data());  //获取物理设备的 队列属性
@@ -137,7 +139,7 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
             vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); // 以某个物理设备，的某个队列家族索引和surface为参数。 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
         }
 
-        //checkDeviceExtensionSupport 获取莫个物理设备的所有 *逻辑设备扩展* ： 核实是否支持交换链扩展 VK_KHR_swapchain， 在接下来的将要创建的逻辑设备中是否可用。
+        //checkDeviceExtensionSupport 获取莫个物理设备的所有 *逻辑设备扩展* 确认支持交换链扩展 VK_KHR_swapchain， 要显示图片，这个逻辑实例扩展一定要有
         vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data());
 
         { // querySwapChainSupport
@@ -148,16 +150,18 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
     }}
 
 {// createLogicalDevice
-    queueCreateInfo.queueFamilyIndex = selected_queuefamily_index;
+    queueCreateInfo.queueFamilyIndex = selected_queuefamily_index;  // 想要启用的队列家族索引（通过它创建队列）, 队列在设备创建时会一同自动创建。
+    queueCreateInfo.queueCount = 1; //我们希望在特定队列家族中启用的队列数量
+
     device_createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
-    // 在创建逻辑设备的时候，请求启用交换链扩展 VK_KHR_swapchain
+    createInfo.pEnabledFeatures = &deviceFeatures; // 希望启用的 vkGetPhysicalDeviceFeatures 特性， 比如几何着色器。
+    // 在创建逻辑设备的时候，请求启用交换链扩展 VK_KHR_swapchain，要显示图片，这个逻辑实例扩展一定要有
     device_createInfo.ppEnabledExtensionNames = deviceExtensions.data(); // vector<const char*> deviceExtensions = {  VK_KHR_SWAPCHAIN_EXTENSION_NAME }
-    device_createInfo.ppEnabledLayerNames = validationLayers.data(); // 推荐使用实例层的验证，Device层的验证已经废弃了。所以这句可以不用。
 
     vkCreateDevice(gpu, &device_createInfo, nullptr, &device);  // 队列随着逻辑设备的创建而自动创建
 
-    vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue); // 用vkGetDeviceQueue函数从队列家族获取队列句柄，并保存在graphicsQueue。因为我们只创建一个队列，用索引0即可。
+    vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue); // 从队列家族获取队列句柄，保存在graphicsQueue。因为我们只创建一个队列，用索引0即可。
     vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 }
 
@@ -195,47 +199,47 @@ glfwGetRequiredInstanceExtensions(&glfwExtensionCount); // 如果在macOS、Win�
 vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); //  在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在的， 然后再在VkInstanceCreateInfo中请求启用。
 #+end_src
 ** 创建一个 VkInstance 对象
-- 物理设备可以简单的将它和GPU硬件对应起来。例如集成显卡对应一个物理设备，独立显卡RTX2080TI对应一个物理设备。一台电脑上经常有多个GPU硬件，例如：集成显卡Intel(R) HD Graphics 630、独立显卡RTX2080TI、计算卡NVIDIA P106。
+- 物理设备可以简单的和GPU硬件对应起来。例如集成显卡对应一个物理设备，独立显卡RTX2080TI对应一个物理设备。一台电脑上经常有多个GPU硬件，例如集成显卡Intel(R) HD Graphics 630、独立显卡RTX2080TI、计算卡NVIDIA P106。
 #+begin_src c++
 // 实例层验证VK_LAYER_KHRONOS_validation默认在终端输出所有验证信息。可以启用实例扩展VK_EXT_debug_utils，然后自定义一个回调函数，就可只输出我们感兴趣的信息。
 instance_createInfo.ppEnabledExtensionNames = extensions.data(); // 包含3个扩展 VK_KHR_surface, VK_MVK_macos_surface,  VK_EXT_debug_utils
 instance_createInfo.ppEnabledLayerNames = validationLayers.data(); // VK_LAYER_KHRONOS_validation, 它是一个大的验证层集合，系统把所有标准常用的验证层，都融合在一起。
 
 populateDebugMessengerCreateInfo(debugmsg_CreateInfo);  // 设置接收消息的回调函数pfnUserCallback，要输出的信息类型：warning, error...触发回调的事件类型：validation, performance...
-instance_createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugmsg_CreateInfo;
-VkDebugUtilsMessengerEXT debugMessenger; // 函数vkCreateDebugUtilsMessengerEXT(instance, debugmsg_CreateInfo...) 生成VkDebugUtilsMessengerEXT的实例。
+instance_createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugmsg_CreateInfo; // 把pNext设为debugmsg_CreateInfo，vkCreateDebugUtilsMessengerEXT和 vkDestroyDebugUtilsMessengerEXT 就可以共用下面的debugMessenger实例。
+VkDebugUtilsMessengerEXT debugMessenger; // 通过函数vkCreateDebugUtilsMessengerEXT(instance, debugmsg_CreateInfo...) 生成VkDebugUtilsMessengerEXT的实例。
 
 vkCreateInstance(&createInfo, nullptr, &instance) // 创建实例，实例层扩展和验证，要在VkInstanceCreateInfo实例创建信息中请求启用。
 #+end_src
 
 ** 创建平面surface, 需要在instance被创建后立即被创建，因为这个surface会作为下面判定莫个物理设备是否合适的一个条件
 #+begin_src c++
-// 下面的这个函数 vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); 以某个物理设备，的某个队列家族索引和这个surface为参数。 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
+// vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); 以某个物理设备，的某个队列家族索引和这个surface为参数。 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
 glfwCreateWindowSurface(instance, window, nullptr, &surface); // 创建surface
 #+end_src
 
 ** 选择物理设备（VkPhysicalDevice）
 - 创建完 instance 后，你可以枚举GPU硬件，从中选取一个或多个物理设备VkPhysicalDevice来使用。一个VkInstance可以有多个VkPhysicalDevice， 一个VkPhysicalDevice可以创建多个逻辑设备VkDevice。目前跨GPU的调用还未实现。
-- 队列簇QueueFamily，以RTX2080TI为例，该显卡功能强大，是2018民用最强的旗舰款，将它类比CPU的核心(方便理解，原理不一样)， 那么该显卡具有多核能力，在Vulkan中它映射为队列。例如：RTX2080TI有16个队列专门用于绘图(Gfx)、8个队列专门用于 计算(Compute)、1个队列(Xfer)用于CPU-GPU-GPU 之间的数据传输。Vulkan将这些专有的功能队列称之为簇， 每一簇里面又分别有不同数量的队列。Vulkan中的操作最终都是提交到Queue来异步执行的， 队列从QueueFamily中分配.
+- 队列簇QueueFamily，例如：RTX2080TI显卡有16个队列专门用于绘图、8个队列专门用于计算、1个队列用于CPU-GPU-GPU 之间的数据传输。Vulkan将这些专有的功能队列称之为簇， 每一簇里面又分别有不同数量的队列。Vulkan中的操作最终都是提交到Queue来异步执行的， 队列从QueueFamily中分配.
 - 选取合适的物理设备， 主要是看某个gup的队列簇QueueFamily是否满足要求，比如，为了要在窗口中显示图片，队列就要支持绘制和显示 + 逻辑设备也要支持交换链扩展
   - 支持绘制，也就是：queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT
   - 是否支持图片显示：vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); 可以判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
-  - 检测逻辑设备是否支持交换链扩展：vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data());
-
+  - 是否支持交换链扩展VK_KHR_swapchain。通过vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data());
 
 #+begin_src c++
 vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
 { // isDeviceSuitable
     {
-        vkGetPhysicalDeviceProperties; // 查询物理设备的属性：支持的Vulkan API版本、设备名称和类型（集成或专用/独立GPU）、厂商ID和限制。
-        vkGetPhysicalDeviceFeatures; // 查询物理设备的特性：纹理压缩、64位浮点数和多视口渲染
+        vkGetPhysicalDeviceProperties(gup, &gpuProperties); // 查询物理设备的属性：支持的Vulkan API版本、设备名称和类型（集成或专用/独立GPU）、厂商ID和限制。
+        vkGetPhysicalDeviceFeatures(gpu, &gpuFeatures); // 获取物理设备的可选特性，如：是否支持geometryShaderh或者tessellationShader，纹理压缩、64位浮点数和多视口渲染
+        if(gpuProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && gpuFeatures.geometryShader);  // 是否独立显卡和支持几何着色器
 
         // findQueueFamilies,  为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
         vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies.data());  //获取物理设备的 队列属性
         if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT);  // 现在我们将只查找支持图形命令的队列
         vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); // 以某个物理设备，的某个队列家族索引和surface为参数。 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
 
-        //checkDeviceExtensionSupport 获取莫个物理设备的所有 *逻辑设备扩展* ： 核实是否支持交换链扩展 VK_KHR_swapchain， 在接下来的将要创建的逻辑设备中是否可用。
+        //checkDeviceExtensionSupport 获取莫个物理设备的所有 *逻辑设备扩展* 确认支持交换链扩展VK_KHR_swapchain， 要显示图片，这个逻辑实例扩展一定是要的。
         vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data());
 
         { // querySwapChainSupport
@@ -249,7 +253,7 @@ vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
 
  
 ** 逻辑设备 VkDevice 和 VkQueue 。
-- 为什么需要创建逻辑设备，不直接使用物理设备。 因为大多数时候我们并不需要物理设备的全部功能，在不同的场景下，只会开启其中的部分功能。比如在挖矿、视频解压等这种情况下就不需要渲染簇；只需要画面显示的应用就不需要Compute簇等等。
+- 为什么需要创建逻辑设备，不直接使用物理设备。 因为大多数时候我们并不需要物理设备的全部功能，在不同的场景下， 只会开启其中的部分功能。比如在挖矿、视频解压等这种情况下就不需要渲染簇；只需要画面显示的应用就不需要Compute簇等等。
 - 逻辑设备扩展：就是在创建逻辑设备时请求启用的扩展。vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data())  在创建逻辑设备前，获取莫个物理设备的所有 *逻辑设备扩展* ： 确认我们想在逻辑设备中使用的扩展都是存在的， 比如检查是否支持交换链扩展 VK_KHR_swapchain， 然后再在VkDeviceCreateInfo中请求启用。
 
 
