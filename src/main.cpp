@@ -265,7 +265,7 @@ private:
 
         createInfo.pEnabledFeatures = &deviceFeatures; // 希望启用的 vkGetPhysicalDeviceFeatures 特性， 比如几何着色器。
 
-        createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+        createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()); // 启用交换链扩展VK_KHR_swapchain，显示图片这个逻辑设备扩展一定要
         createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
         if (enableValidationLayers) { // 基于逻辑设备的验证层已经废弃，这里只是为了兼容性才进行设置，其实完全可以不设置，直接把0赋给enabledLayerCount就可以了。
