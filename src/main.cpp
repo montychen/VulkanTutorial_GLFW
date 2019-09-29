@@ -144,7 +144,7 @@ private:
     }
 
     void createInstance() {
-        if (enableValidationLayers && !checkValidationLayerSupport()) {
+        if (enableValidationLayers && !checkValidationLayerSupport()) { // 检查 VK_LAYER_KHRONOS_validation
             throw std::runtime_error("validation layers requested, but not available!");
         }
 
@@ -160,13 +160,14 @@ private:
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         createInfo.pApplicationInfo = &appInfo;
 
-        auto extensions = getRequiredExtensions();
+        // 实例层验证VK_LAYER_KHRONOS_validation默认在终端输出所有验证信息。可以启用实例扩展VK_EXT_debug_utils，然后自定义一个回调函数，就可只输出我们感兴趣的信息。
+        auto extensions = getRequiredExtensions(); // 包含3个扩展 VK_KHR_surface, VK_MVK_macos_surface,  VK_EXT_debug_utils
         createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
         createInfo.ppEnabledExtensionNames = extensions.data();
 
         VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
         if (enableValidationLayers) {
-            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size()); // 启用验证层，要接收验证层调试信息，还要启用VK_EXT_debug_utils扩展
+            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size()); // 启用验证层VK_LAYER_KHRONOS_validation
             createInfo.ppEnabledLayerNames = validationLayers.data();
 
             populateDebugMessengerCreateInfo(debugCreateInfo);
@@ -510,7 +511,7 @@ private:
         std::vector<VkLayerProperties> availableLayers(layerCount);
         vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 
-        for (const char* layerName : validationLayers) {   // 检查是否validationLayers 中所有的层都存在于availableLayers 列表中。
+        for (const char* layerName : validationLayers) {   // 检查是否validationLayers 中所有的层都存在于availableLayers 列表中。 这里只有VK_LAYER_KHRONOS_validation
             bool layerFound = false;
 
             for (const auto& layerProperties : availableLayers) {

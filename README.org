@@ -181,7 +181,10 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
 
 * 初始化过程涉及的对象
 
-** 创建实例前，先确认所有想要的实例层扩展和验证是否都存在
+** 创建实例前，先确认所有想要的实例层扩展和验证是否都存在:
+- 3个实例层扩展 VK_KHR_surface, VK_MVK_macos_surface,  VK_EXT_debug_utils
+- 1个实例层验证 VK_LAYER_KHRONOS_validation
+
 扩展有2类，实例层扩展和逻辑设备扩展。现在推荐使用实例层验证，逻辑设备层验证不推荐使用了。
 - 实例扩展：就是创建实例时将要请求启用的扩展
   - vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data()) 创建实例前，先获取所有可以用于实例的扩展， 确认所有想要的扩展都是存在的。 然后再在VkInstanceCreateInfo中请求启用。
@@ -190,13 +193,18 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
 - 实例层验证：vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); 在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在的， 然后再在VkInstanceCreateInfo中请求启用。
   - 实例层验证的作用：函数调用传递的参数是否符合规范、对象的创建和销毁是否有内存泄露、线程是否安全、记录每个函数调用并在标准设备上输出、分析函数调用和重播
   - 最常用的实例层验证是：VK_LAYER_KHRONOS_validation，它是一个大的验证层集合，系统把所有标准常用的验证层都融合在一起。VK_LAYER_KHRONOS_validation默认在终端输出所有验证层的调试信息。启用实例扩展 VK_EXT_debug_utils后， 我们可以自己定义一个回调函数，输出我们感兴趣的信息。
+    
 #+begin_src c++
 vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 glfwGetRequiredInstanceExtensions(&glfwExtensionCount); // 如果在macOS、Win系统上，这个方法可以方便的返回实例层用来创建surface所需要的扩展列表，不但有基础的VK_KHR_surface扩展， 还有针对特定操作系统的扩展，macOS是 VK_MVK_macos_surface
 vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); //  在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在的， 然后再在VkInstanceCreateInfo中请求启用。
 #+end_src
 ** 创建一个 VkInstance 对象
-- 物理设备可以简单的和GPU硬件对应起来。例如集成显卡对应一个物理设备，独立显卡RTX2080TI对应一个物理设备。一台电脑上经常有多个GPU硬件，例如集成显卡Intel(R) HD Graphics 630、独立显卡RTX2080TI、计算卡NVIDIA P106。
+- 在instance_createInfo中启用实例层扩展、实例层验证；
+- 把pNext设为debugmsg_CreateInfo， 让2个自定义函数vkCreateDebugUtilsMessengerEXT 和 vkDestroyDebugUtilsMessengerEXT 可以共用一个VkDebugUtilsMessengerEXT实例
+
+物理设备可以简单的和GPU硬件对应起来。例如集成显卡对应一个物理设备，独立显卡RTX2080TI对应一个物理设备。一台电脑上经常有多个GPU硬件，例如集成显卡Intel(R) HD Graphics 630、独立显卡RTX2080TI、计算卡NVIDIA P106。
+
 #+begin_src c++
 // 实例层验证VK_LAYER_KHRONOS_validation默认在终端输出所有验证信息。可以启用实例扩展VK_EXT_debug_utils，然后自定义一个回调函数，就可只输出我们感兴趣的信息。
 instance_createInfo.ppEnabledExtensionNames = extensions.data(); // 包含3个扩展 VK_KHR_surface, VK_MVK_macos_surface,  VK_EXT_debug_utils
@@ -204,12 +212,26 @@ instance_createInfo.ppEnabledLayerNames = validationLayers.data(); // VK_LAYER_K
 
 populateDebugMessengerCreateInfo(debugmsg_CreateInfo);  // 设置接收消息的回调函数pfnUserCallback，要输出的信息类型：warning, error...触发回调的事件类型：validation, performance...
 instance_createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugmsg_CreateInfo; // 把pNext设为debugmsg_CreateInfo，vkCreateDebugUtilsMessengerEXT和 vkDestroyDebugUtilsMessengerEXT 就可以共用下面的debugMessenger实例。
-VkDebugUtilsMessengerEXT debugMessenger; // 通过函数vkCreateDebugUtilsMessengerEXT(instance, debugmsg_CreateInfo...) 生成VkDebugUtilsMessengerEXT的实例。
 
 vkCreateInstance(&createInfo, nullptr, &instance) // 创建实例，实例层扩展和验证，要在VkInstanceCreateInfo实例创建信息中请求启用。
 #+end_src
 
-** 创建平面surface, 需要在instance被创建后立即被创建，因为这个surface会作为下面判定莫个物理设备是否合适的一个条件
+** 创建VkDebugUtilsMessengerEXT实例
+
+- 创建函数vkCreateDebugUtilsMessengerEXT 和 vkDestroyDebugUtilsMessengerEXT 共用的VkDebugUtilsMessengerEXT实例
+#+begin_src c++
+VkDebugUtilsMessengerEXT debugMessenger;
+VkDebugUtilsMessengerCreateInfoEXT debugmsg_CreateInfo;
+
+// populateDebugMessengerCreateInfo
+debugmsg_CreateInfo.messageSeverity =  VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT; //要输出的信息类型：warning, error...
+debugmsg_CreateInfo.messageType =  VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT; // 触发回调的事件类型：validation, performance...
+debugmsg_CreateInfo.pfnUserCallback = debugCallback; //  设置接收消息的回调函数
+
+vkCreateDebugUtilsMessengerEXT(instance, &debugmsg_CreateInfo, nullptr, &debugMessenger); // 生成VkDebugUtilsMessengerEXT的实例。
+#+end_src
+
+** 创建平面surface, 需要在instance被创建后立即被创建，因为这个surface会作为下面选择物理设备是否合适的一个条件
 #+begin_src c++
 // vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); 以某个物理设备，的某个队列家族索引和这个surface为参数。 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
 glfwCreateWindowSurface(instance, window, nullptr, &surface); // 创建surface
@@ -271,12 +293,10 @@ vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
 ** 创建一个窗口，窗口 surface 和交换链
 - 窗口 *VkSurfaceKHR* ： 后缀 KHR 意思是这些对象是 Vulkan 扩展的一部分。除非你不想显示图形(比如你只想离屏渲染)，不然你还是需要创建一个窗口来显示的。Vulkan API 是完全的平台不可知论者，这就是我们需要用标准化 WSI（窗口系统接口）扩展与窗口管理器交互的原因。Surface 是对可渲染窗口的跨平台抽象，一般通过提供一个本地窗口句柄的方式来实例化，例如在 Windows 上提供的句柄是 HWND。幸运的是，GLFW 库可以帮助我们处理不同平台的窗口问题。
 
-- 交换链 *VkSwapchainKHR* ：Vulkan 中没有 *默认帧缓冲区 default framebuffer* 的概念。交换链确保当窗口系统在显示一个图像时，应用程序可以准备下一个图像，保证 image 完全渲染完毕后才能进行显示十分重要。交换链最初的目的是使绘制图像的最终呈现与屏幕的刷新频率同步。
+- 交换链 *VkSwapchainKHR* ：Vulkan 中没有 *默认帧缓冲区 default framebuffer* 的概念。交换链确保当窗口系统在显示一个图像时，应用程序可以准备下一个图像， 保证 image 完全渲染完毕后才能进行显示十分重要。每次我们想绘制一帧时， 我们请求交换链提供给我们一个用于渲染的 image，当这一帧完成绘制后，这个 image 返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。
 
-- 可以简单将交换链理解为一个队列，同步生产者(即应用程序绘制图像)和消费者(屏幕刷新)的关系。每次我们想绘制一帧时，我们请求交换链提供给我们一个用于渲染的 image，当这一帧完成绘制后，这个 image 返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。有的平台允许你直接渲染到显示器，无需与窗口管理器交互，只要使用 *VK_KHR_display* 和 *VK_KHR_display_swapchain* 扩展即可。这样你就可以创建一个代表整个显示器区域的 surface，用其实现自己的窗口管理器。
-
-- 如果支持交换链，会涉及3个扩展：两种源于实例层，另一个就是作用于逻辑设备层的交换链扩展：VK_KHR_swapchain。
-  - 第一种是在实例层定义的 *VK_KHR_surface* 扩展。 它可描述“平面”对象，即应用窗口的逻辑表现形式。 该扩展支持我们查看平面的不同参数（功能、支持的格式、大小），并查询特定物理设备是否支持交换链 （更确切的说，特定队列家族是否支持 在特定平面上演示图像）。 这些信息非常实用，因为我们不想选择物理设备并尝试通过它创建逻辑设备，来了解它是否支持交换链。 该扩展还可定义破环此类平面的方法。
+- 如果支持交换链，会涉及3个扩展：两种源于实例层，另一个就是作用于逻辑设备层的交换链扩展： *VK_KHR_swapchain* 
+  - 第一种是在实例层定义的 *VK_KHR_surface* 扩展。 它描述“平面”对象，即应用窗口的逻辑表现形式。 该扩展支持我们查看平面的不同参数（功能、支持的格式、大小）， 并查询特定物理设备是否支持交换链 （更确切的说，特定队列家族是否支持在特定平面上演示图像）。 这些信息非常实用，因为我们不想选择物理设备并尝试通过它创建 逻辑设备， 来了解它是否支持交换链。 该扩展还可定义破环此类平面的方法。
   - 第二种实例层扩展依赖于操作系统，*glfwgetrequiredinstanceextensionsll* 返回 *实例层* 用来创建surface的扩展列表，不但有基础的VK_KHR_surface扩展， 还有针对特定操作系统扩展：
     - Windows中称为 VK_KHR_win32_surface
     - Linux中称为 VK_KHR_xlib_surface 或 VK_KHR_xcb_surface
