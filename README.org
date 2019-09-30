@@ -194,9 +194,9 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
 
 - 实例层验证：vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); 在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在的， 然后再在VkInstanceCreateInfo中请求启用。
   - 实例层验证的作用：函数调用传递的参数是否符合规范、对象的创建和销毁是否有内存泄露、线程是否安全、记录每个函数调用并在标准设备上输出、分析函数调用和重播
-  - 最常用的实例层验证是：VK_LAYER_KHRONOS_validation，它是一个大的验证层集合，系统把所有标准常用的验证层都融合在一起。VK_LAYER_KHRONOS_validation默认在终端输出所有验证层的调试信息。启用实例扩展 VK_EXT_debug_utils后， 我们可以自己定义一个回调函数，输出我们感兴趣的信息。
+  - 最常用的实例层验证是：VK_LAYER_KHRONOS_validation，它是一个大的验证层集合，系统把所有标准常用的验证层都融合在一起。 它默认在终端输出所有验证层的调试信息。 启用实例扩展 VK_EXT_debug_utils后， 定义一个回调函数，只输出我们感兴趣的信息。
     
-- 逻辑设备扩展：就是在创建逻辑设备时请求启用的扩展。vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data())  在创建逻辑设备前，获取莫个物理设备的所有 *逻辑设备扩展* ： 确认我们想在逻辑设备中使用的扩展都是存在的， 比如检查是否支持交换链扩展 VK_KHR_swapchain， 然后再在VkDeviceCreateInfo中请求启用。
+- 逻辑设备扩展：就是在创建逻辑设备时请求启用的扩展。经常在选择合适的物理设备时，使用vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data())  在创建逻辑设备前，获取莫个物理设备的所有 *逻辑设备扩展* ： 确认我们想在逻辑设备中使用的扩展都是存在的， 比如检查是否支持交换链扩展 VK_KHR_swapchain， 然后再在VkDeviceCreateInfo中请求启用。
     
 #+begin_src c++
 vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
@@ -221,7 +221,6 @@ vkCreateInstance(&createInfo, nullptr, &instance) // 创建实例，实例层扩
 #+end_src
 
 ** 创建VkDebugUtilsMessengerEXT实例
-
 - 创建函数vkCreateDebugUtilsMessengerEXT 和 vkDestroyDebugUtilsMessengerEXT 共用的VkDebugUtilsMessengerEXT实例
 #+begin_src c++
 VkDebugUtilsMessengerEXT debugMessenger;
@@ -237,13 +236,21 @@ vkCreateDebugUtilsMessengerEXT(instance, &debugmsg_CreateInfo, nullptr, &debugMe
 
 ** 创建平面surface, 需要在instance被创建后立即被创建，因为这个surface会作为下面选择物理设备是否合适的一个条件
 #+begin_src c++
-// vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); 以某个物理设备，的某个队列家族索引和这个surface为参数。 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
+// vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
 glfwCreateWindowSurface(instance, window, nullptr, &surface); // 创建surface
 #+end_src
 
 ** 选择物理设备（VkPhysicalDevice）：队列支持绘制和显示 + 逻辑设备支持交换链扩展VK_KHR_swapchain
-- 创建完instance后，枚举GPU硬件，选取一个或多个物理设备VkPhysicalDevice来用。一个VkInstance可有多个VkPhysicalDevice， 一个VkPhysicalDevice可以创建多个逻辑设备VkDevice。目前跨GPU的调用还未实现。
-- 队列簇QueueFamily，例如：RTX2080TI显卡有16个队列专门用于绘图、8个队列专门用于计算、1个队列用于CPU-GPU-GPU 之间的数据传输。Vulkan将这些专有的功能队列称之为簇， 每一簇里面又分别有不同数量的队列。Vulkan中的操作最终都是提交到Queue来异步执行的， 队列从QueueFamily中分配.
+- 枚举GPU硬件，选取一个或多个物理设备。一个VkInstance可有多个VkPhysicalDevice， 一个VkPhysicalDevice可创建多个逻辑设备VkDevice。跨GPU的调用还未实现。
+- 队列簇QueueFamily，如：RTX2080TI显卡有16个队列用于绘图、8个队列用于计算、1个队列用于CPU和GPU间的数据传输。Vulkan将这些专有的功能队列称之为簇， 每一簇里面又分别有不同数量的队列。
+- queue的职责是收集命令（命令缓冲区）并将其分派给gpu执行。 队列从QueueFamily中分配，Vulkan中的操作最终提交到Queue来异步执行的。共有4种队列
+  - VK_QUEUE_GRAPHICS_BIT：图形
+  - VK_QUEUE_COMPUTE_BIT：计算
+  - VK_QUEUE_TRANSFER_BIT：传送（复制等内存操作）
+  - VK_QUEUE_SPARSE_BINDING_BIT：内存绑定操作，用于更新稀疏资源。
+    - 在矩阵中，若数值为0的元素远远多于非0元素，并且非0元素分布没有规律时，则称该矩阵为 *稀疏矩阵* ；与之相反，若非0元素占大多数时，则称该矩阵为 *稠密矩阵* 。
+    - *稀疏内存* 是一项特殊功能，可让您存储大型图像资源；图像在内存中的存储容量远大于实际的存储容量。 这种技术是将图像分解为图块，并仅加载适合应用程序逻辑的图块。
+
 - 选取合适的物理设备， 主要是看某个gup的队列簇QueueFamily是否满足要求，比如，为了要在窗口中显示图片， *队列支持绘制和显示 + 逻辑设备也要支持交换链扩展*
   - 需要注意的是，支持绘制和呈现的队列不一定是同一个。
   - *VK_QUEUE_GRAPHICS_BIT* 队列支持绘制，也就是：queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT
@@ -261,7 +268,7 @@ vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
         // findQueueFamilies,  为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
         vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies.data());  //获取物理设备的 队列属性
         if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT);  // 现在我们将只查找支持图形命令的队列
-        vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); // 以某个物理设备，的某个队列家族索引和surface为参数。 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
+        vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); // 判断某个gpu、某个队列家族、是否支持在这个surface显示present图像。
 
         //checkDeviceExtensionSupport 获取莫个物理设备的所有 *逻辑设备扩展* 确认支持交换链扩展VK_KHR_swapchain， 要显示图片，这个逻辑实例扩展一定是要的。
         vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data());
@@ -276,7 +283,7 @@ vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
 #+end_src
 
 
-** 逻辑设备 VkDevice 和 VkQueue 。
+** 创建逻辑设备 VkDevice 。
 - 为什么需要创建逻辑设备? 因为大多数时候我们不需要物理设备的全部功能，在不同的场景， 只会开启其中的部分功能。比如挖矿、视频解压等情况就不需要渲染簇； 要画面显示的应用就不需要Compute簇等等。
 
 #+begin_src c++
@@ -292,19 +299,6 @@ vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue); // 
 vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue
 
 #+end_src
-
-#+ATTR_latex: :width 800
-#+ATTR_HTML: :width 800
-#+ATTR_ORG: :width 800
-[[file:queue_family.png]]
-
-*** 队列queue的职责是收集命令（命令缓冲区）并将其分派给物理设备执行。一共有4种队列
--       VK_QUEUE_GRAPHICS_BIT：图形
--        VK_QUEUE_COMPUTE_BIT：计算
--       VK_QUEUE_TRANSFER_BIT：传送（复制等内存操作）
-- VK_QUEUE_SPARSE_BINDING_BIT：内存绑定操作，用于更新稀疏资源。
-  - 在矩阵中，若数值为0的元素远远多于非0元素，并且非0元素分布没有规律时，则称该矩阵为 *稀疏矩阵* ；与之相反，若非0元素占大多数时，则称该矩阵为 *稠密矩阵* 。
-  - *稀疏内存* 是一项特殊功能，可让您存储大型图像资源；图像在内存中的存储容量远大于实际的存储容量。 这种技术是将图像分解为图块，并仅加载适合应用程序逻辑的图块。
 
 
 ** 创建一个窗口，窗口 surface 和交换链
