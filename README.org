@@ -157,7 +157,7 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
     device_createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.pEnabledFeatures = &deviceFeatures; // 希望启用的 vkGetPhysicalDeviceFeatures 特性， 比如几何着色器。
 
-    device_createInfo.ppEnabledExtensionNames = deviceExtensions.data(); // 启用交换链扩展VK_KHR_swapchain，显示图片这个逻辑设备扩展一定要
+    device_createInfo.ppEnabledExtensionNames = deviceExtensions.data(); //启用逻辑设备交换链扩展VK_KHR_swapchain，显示图片这个一定要。deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME }
     vkCreateDevice(gpu, &device_createInfo, nullptr, &device);  // 队列随着逻辑设备的创建而自动创建
 
     vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue); // 从队列家族获取队列句柄，保存在graphicsQueue。因为我们只创建一个队列，用索引0即可。
@@ -234,7 +234,8 @@ debugmsg_CreateInfo.pfnUserCallback = debugCallback; //  设置接收消息的�
 vkCreateDebugUtilsMessengerEXT(instance, &debugmsg_CreateInfo, nullptr, &debugMessenger); // 生成VkDebugUtilsMessengerEXT的实例。
 #+end_src
 
-** 创建平面surface, 需要在instance被创建后立即被创建，因为这个surface会作为下面选择物理设备是否合适的一个条件
+** 创建窗口surface, 需要在instance被创建后立即被创建，因为这个surface会作为下面选择物理设备是否合适的一个条件
+- 窗口 *VkSurfaceKHR* ： 后缀 KHR 意思是这些对象是 Vulkan 扩展的一部分。除非你不想显示图形(比如你只想离屏渲染)，不然你还是需要创建一个窗口来显示的。Vulkan API 是完全的平台不可知论者，这就是我们需要用标准化 WSI（窗口系统接口）扩展与窗口管理器交互的原因。Surface 是对可渲染窗口的跨平台抽象，一般通过提供一个本地窗口句柄的方式来实例化，例如在 Windows 上提供的句柄是 HWND。
 #+begin_src c++
 // vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
 glfwCreateWindowSurface(instance, window, nullptr, &surface); // 创建surface
@@ -292,7 +293,7 @@ queueCreateInfo.queueCount = 1; //我们希望在特定队列家族中启用的�
 device_createInfo.pQueueCreateInfos = queueCreateInfos.data();
 createInfo.pEnabledFeatures = &deviceFeatures; // 希望启用的 vkGetPhysicalDeviceFeatures 特性， 比如几何着色器。
 
-device_createInfo.ppEnabledExtensionNames = deviceExtensions.data(); // 启用交换链扩展VK_KHR_swapchain，显示图片这个逻辑设备扩展一定要
+device_createInfo.ppEnabledExtensionNames = deviceExtensions.data(); //启用逻辑设备交换链扩展VK_KHR_swapchain，显示图片这个一定要。deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME }
 vkCreateDevice(gpu, &device_createInfo, nullptr, &device);  // 队列随着逻辑设备的创建而自动创建
 
 vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue); // 从队列家族获取队列句柄，保存在graphicsQueue。因为我们只创建一个队列，用索引0即可。
@@ -301,10 +302,20 @@ vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue
 #+end_src
 
 
-** 创建一个窗口，窗口 surface 和交换链
-- 窗口 *VkSurfaceKHR* ： 后缀 KHR 意思是这些对象是 Vulkan 扩展的一部分。除非你不想显示图形(比如你只想离屏渲染)，不然你还是需要创建一个窗口来显示的。Vulkan API 是完全的平台不可知论者，这就是我们需要用标准化 WSI（窗口系统接口）扩展与窗口管理器交互的原因。Surface 是对可渲染窗口的跨平台抽象，一般通过提供一个本地窗口句柄的方式来实例化，例如在 Windows 上提供的句柄是 HWND。幸运的是，GLFW 库可以帮助我们处理不同平台的窗口问题。
-
+** 创建 surface 和交换链
 - 交换链 *VkSwapchainKHR* ：Vulkan 中没有 *默认帧缓冲区 default framebuffer* 的概念。交换链确保当窗口系统在显示一个图像时，应用程序可以准备下一个图像， 保证 image 完全渲染完毕后才能进行显示十分重要。每次我们想绘制一帧时， 我们请求交换链提供给我们一个用于渲染的 image，当这一帧完成绘制后，这个 image 返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。
+  
+- vertical blank Interval VBI 垂直同步/垂直空白间隙： 我们通常收看的电视图象是由电子枪发射的电子串高速轰击显象管上的荧光物质而产生的，电子串按从左至右， 从上至下的方式扫 描整个屏幕， 速度十分快，所以我们的眼睛感觉不到，当电子枪的扫描位置从左上角达到右下角时，必须由右下角回到下一帧的左上角，以进行下一 张画面的显示。 而电子束的移动是需要时间的, 从右下角回到 左上角所花费的时间就是垂直空白间隙。
+  - VBI 垂直同步: 现在的显示器一般都支持双缓冲（double buffer），一个由GPU写入，一个由显示器读取，到了时间再对换。详细的过程是： 当显示器绘制完A-buffer 中的像素之后（即绘制完第n+1帧），就会去读取B-buffer（GPU已经写入好的第n+2帧），而GPU则转到这个被显示器已经读完的A-buffer，向其中写入第n+3帧的像素信息。有一种情况可能发生，在不严格规定时间间隙的情况下，GPU和显示器可能同时操作同一个buffer，就会导致画面的撕裂。（显示器绘制第n+1帧到一半，buffer里突然出现了第n+2帧的信息，造成显示器上一半第n+1帧，一半第n+2帧的画面）如果约定在vertical blank期间对换buffer，那么就能避免这个问题。 这个约定就称为“垂直同步”。 因此，垂直同步不会增加GPU的负载， 但是会减少单位 时间内 画面的帧数， 因为即使GPU渲染完了一帧， 必须要等待vertical blank，才能将像素信息写入另一个buffer。
+
+  - VBI间隙信息传送: 在垂直空白间隙中，显示器不会显示影像，影像讯号也不会被显示器给删除步。这一段时间对于设备来说是一个浪费，因此人们想了办法来利用这一段时间， 电视台可以利用这一时间发送一些不可显示信息，如果您使用过图文电视您就会立刻明白，为什么图文电视卡要接收电视信号，电视卡可以解读这一信息，而电视不能，这种信息就是利用垂直回扫期发送的，电视卡通过RS-232端口将接收到的不可显示信息传送给计算机，由计算机加以处理，这就是图文电视的原理，也就是说，电视台利用垂直回扫期发送一些不可显示的信息，而图文电视卡将这种信息接收下来，经过解码发送到计算机内由计算机处理。
+
+- Presentation模式是交换链配置中最重要的一个，因为它代表了呈现image到屏幕的条件。Vulkan中有4个可能的模式：
+  - VK_PRESENT_MODE_IMMEDIATE_KHR ：俗称“立即渲染”，它只用一个framebuffer，渲染操作直接渲染到该缓冲，显示器刷新到来时直接从缓冲中取出这张图像并显示。 由于显示和渲染是并行执行的，存在渲染未完成时就被显示器取走了， 导致取走的图像中一半是之前的结果，一半是这次未完全渲染的结果， 导致“图像撕裂”。渲染频率 大于或小于vblank频率都会造成撕裂。
+  - VK_PRESENT_MODE_FIFO_KHR：交换链是一个队列，显示器刷新时，从队列头部拿一个image，程序将渲染好的image放到队列尾部。如果队列满了程序必须等待。 这与现代游戏中的垂直同步最相似。显示器被刷新的时刻称为:垂直回归
+  - VK_PRESENT_MODE_FIFO_RELAXED_KHR：只有当垂直回归结束后，app晚了，队列空了，这一模式才与上一个模式有所区别。它不等待下一次垂直回归，而是当image到达 时立即传送。这可能导致可见的撕裂。
+  - VK_PRESENT_MODE_MAILBOX_KHR：第二个模式的另一个变种。队列满时，它不阻塞app，队列中的image直接被新的替换掉。这个模式可以被用于实现三缓存，其允许你 避免撕裂，且大幅减少延迟问题（与双缓存的垂直同步模式相比）
+
 
 - 如果支持交换链，会涉及3个扩展：两种源于实例层，另一个就是作用于逻辑设备层的交换链扩展： *VK_KHR_swapchain* 
   - 第一种是在实例层定义的 *VK_KHR_surface* 扩展。 它描述“平面”对象，即应用窗口的逻辑表现形式。 该扩展支持我们查看平面的不同参数（功能、支持的格式、大小）， 并查询特定物理设备是否支持交换链 （更确切的说，特定队列家族是否支持在特定平面上演示图像）。 这些信息非常实用，因为我们不想选择物理设备并尝试通过它创建 逻辑设备， 来了解它是否支持交换链。 该扩展还可定义破环此类平面的方法。
