@@ -276,8 +276,8 @@ vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
 
         { // querySwapChainSupport
             vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
-            vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素格式，颜色空间）
-            vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式
+            vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素用32位表示VK_FORMAT_B8G8R8A8_UNORM、使用SRGB颜色空间 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+            vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式: VK_PRESENT_MODE_IMMEDIATE_KHR、FIFO、FIFO_RELAXED、MAILBOX
         }
     }
 
