@@ -144,7 +144,7 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
         //checkDeviceExtensionSupport 获取莫个物理设备的所有 *逻辑设备扩展* 确认支持交换链扩展VK_KHR_swapchain， 要显示图片，这个逻辑设备扩展一定要
         vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data());
 
-        { // querySwapChainSupport
+        { // querySwapChainSupport   //获取surface的 capabilities、formats、presentModes
             vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
             vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素格式，颜色空间）
             vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式
@@ -165,9 +165,10 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
 }
 
 {// createSwapChain
-    VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
-    VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+// if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+    VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats); // VK_FORMAT_B8G8R8A8_UNORM像素用32位表示。SRGB颜色空间 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+    VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes); //  优先使用 VK_PRESENT_MODE_MAILBOX_KHR
+    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities); // extent是SwapChain中image的分辨率(resolution), 通常它与window的尺寸一样
 
     swapchain_createInfo.imageFormat = surfaceFormat.format;
     swapchain_createInfo.imageColorSpace = surfaceFormat.colorSpace;
@@ -274,12 +275,8 @@ vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
         //checkDeviceExtensionSupport 获取莫个物理设备的所有 *逻辑设备扩展* 确认支持交换链扩展VK_KHR_swapchain， 要显示图片，这个逻辑实例扩展一定是要的。
         vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data());
 
-        { // querySwapChainSupport
-            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
-            vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素用32位表示VK_FORMAT_B8G8R8A8_UNORM、使用SRGB颜色空间 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
-            vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式: VK_PRESENT_MODE_IMMEDIATE_KHR、FIFO、FIFO_RELAXED、MAILBOX
-        }
     }
+}
 
 #+end_src
 
@@ -302,24 +299,24 @@ vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue
 #+end_src
 
 
-** 创建 surface 和交换链
+** 设定surface和创建Swapchain
 - 交换链 *VkSwapchainKHR* ：Vulkan 中没有 *默认帧缓冲区 default framebuffer* 的概念。交换链确保当窗口系统在显示一个图像时，应用程序可以准备下一个图像， 保证 image 完全渲染完毕后才能进行显示十分重要。每次我们想绘制一帧时， 我们请求交换链提供给我们一个用于渲染的 image，当这一帧完成绘制后，这个 image 返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。
   
-- vertical blank Interval vblank 垂直同步/垂直空白间隙： 我们通常收看的电视图象是由电子枪发射的电子串高速轰击显象管上的荧光物质而产生的，电子串按 从左至右， 从上至下的方式扫 描整个屏幕， 速度十分快，所以我们的眼睛感觉不到，当电子枪的扫描位置从左上角达到右下角时，必须由右下角回到下一 帧的左上角，以进行下一 张画面的显示。 而电子束的移动是需要时间的, 从右下角回到左上角所花费的时间就是垂直空白间隙。
-  - vblank 垂直同步: 现在的显示器一般都支持双缓冲，一个由GPU写入，一个由显示器读取，到了时间再对换。详细的过程是： 当显示器绘制完A-buffer 中的像素后 （即绘制完第n+1帧），就会去读取B-buffer（GPU已经完成写入的第n+2帧），而GPU则转到这个被显示器已经读完的A-buffer，向其中写入第n+3帧的像素信息。有一种情况可能发生，在不严格规定时间间隙的情况下，GPU和显示器可能同时操作同一个buffer，就会导致 *画面的撕裂screen tearing* 。 显示器绘制 第n+1帧 到一半，buffer里 突然出现了第n+2帧的信息，造成显示器上的内容一半是第n+1帧，另一半是第n+2帧的，如果约定在vertical blank期间对 换buffer， 那么就能避免这个问题。 这个约定 就称为“垂直同步”。 因此，垂直同步不会增加GPU的负载， 但是会减少单位时间内画面的帧数， 因为即使 GPU渲染完了一帧， 必须要等待vertical blank， 才能将像素信息写入另一个buffer。
-    - 垂直同步的副作用 *「卡顿」 「画面延迟」* ：目前还有很多显示器刷新率是 60Hz，也就是每秒钟要显示 60 张画面，如果显卡每秒产生 120 张画面， 而显示器每秒只读取 60 张，这会出现什么问题呢？显示器提取画面的时候会从上到下一行一行（逐行扫描）把画面显示出来，本来要 1/60 秒才能显示完， 然而显示了一半（1/120 秒）下一张画面就塞进来了。这时候显示器并不会停止工作，而是囫囵吞枣地把上一张画面的一半与下一张画面都显示出来。 由于 两张画面不一样，结果就是上面半截是第一张画面，下面半截是第二张画面，也就是所谓的 *画面撕裂* 。然而打开垂直同步又会引发一个问题。 如果跑步健将 博尔牛寺第 0 秒在起跑线上，第1/60秒就跑到了终点，那每秒渲染 60 张画面就完全看不到他中间的跑步过程！一开始就直接跑完。这就是所谓的 *「卡顿」* ，画面并不连贯。 于是你会发现 不少游戏 下面还有一个「双重缓冲」的开关，也就是多开设一个缓冲区。显卡依旧每秒渲染 120 张画面，第一张存在 缓冲区1， 第二张存在缓冲区2。 显示器来读取画 面的时候按顺序先从缓冲区 1 那里读完，再从缓冲区 2 那里读。这样就不会撕裂也不会卡顿了啊~然而 这又出现一个 问题本来博尔牛寺 1/60 秒就把比赛跑完了，显卡也把中间过程给渲染出来了，双重缓冲打开了之后，显示器从缓冲区 1 中读取第 0 秒的画面， 再从缓冲区 2 中读取第 1/120 秒的画面，再又回到缓冲区 1 中读取第 1/60 秒一共三张画面。显示器每 1/60 秒读取一张，所以一共用时 3/60 秒。结果 就是博尔牛寺 活生生花了 3/60 秒才跑完，这就是所谓的 *「画面延迟」* 。
+- vertical blank Interval vblank 垂直同步/垂直空白间隙： 我们通常收看的电视图象是由电子枪发射的电子串高速轰击显象管上的荧光物质而产生的，电子串按 从左至右， 从上至下的方式扫 描整个屏幕， 速度十分快，所以我们 的眼睛 感觉不到，当电子枪的扫描位置从左上角达到右下角时，必须由右下角回到下一 帧的左上角，以进行下一 张画面的显示。 而电子束的移动是需要时间的, 从右下角回到左上角所花费的时间就是垂直空白间隙。
+  - vblank 垂直同步: 现在的显示器一般都支持双缓冲，一个由GPU写入，一个由显示器读取，到了时间再对换。详细的过程是： 当显示器绘制完A-buffer中的像素后（即绘制完第n+1帧），就会去读取B-buffer（GPU已经完成 写入的 第n+2帧）， 而GPU则转到这个被显示器已经读完的A-buffer，向其中写入第n+3帧的像素信息。有一种情况可能发生，在不严格规定时间间隙的情况下，GPU和显示器可能同时操作同一个buffer，就会导致 *画面的撕裂screen tearing* 。 显示器绘制 第n+1帧 到一半，buffer里 突然出现了第n+2帧的信息，造成显示器上的内容一半是第n+1帧，另一半是第n+2帧的，如果约定在vertical blank期间对 换buffer， 那么就能避免这个问题。 这个约定 就称为“垂直同步”。 因此，垂直同步不会增加GPU的负载， 但是会减少单位时间内画面的帧数， 因为即使 GPU渲染完了一帧， 必须要等待vertical blank， 才能将像素信息写入另一个buffer。
+    - 垂直同步的副作用 *「卡顿」 「画面延迟」* ：目前还有很多显示器刷新率是 60Hz，也就是每秒钟要显示 60 张画面，如果显卡每秒产生 120 张画面， 而显示器每秒只读取 60 张，这会出现什么问题呢？ 显示器提取画面的时候会从上 到下一行一行（逐行扫描）把画面显示出来，本来要 1/60 秒才能显示完， 然而显示了一半（1/120 秒）下一张画面就塞进来了。这时候显示器并不会停止工作，而是囫囵吞枣地把上一张画面的一半与下一张画面都显示出来。 由于 两张画面不一样，结果就是上面半截是第一张画面，下面半截是第二张画面，也就是所谓的 *画面撕裂* 。然而打开垂直同步又会引发一个问题。 如果跑步健将 博尔牛寺第 0 秒在起跑线上，第1/60秒就跑到了终点，那每秒渲染 60 张画面就完全看不到他中间的跑步过程！一开始就直接跑完。这就是所谓的 *「卡顿」* ，画面并不连贯。 于是你会发现 不少游戏 下面还有一个「双重缓冲」的开关，也就是多开设一个缓冲区。显卡依旧每秒渲染 120 张画面， 第一张存在 缓冲区1， 第二张存在缓冲区2。 显示器来读取画 面的时候按顺序先从缓冲区 1 那里读完，再从缓冲区 2 那里读。这样就不会撕裂也不会卡顿了啊~然而 这又出现一个 问题本来博尔牛寺 1/60 秒就把比赛跑完了， 显卡也把中间过程给渲染出来了，双重缓冲打开了之后，显示器从缓冲区 1 中读取第 0 秒的画面， 再从缓冲区 2 中读取第 1/120 秒的画面，再又回到缓冲区 1 中读取第 1/60 秒一共三张画面。显示器每 1/60 秒读取一张， 所以一共用时 3/60 秒。结果 就是博尔牛寺 活生生花了 3/60 秒才跑完，这就是所谓的 *「画面延迟」* 。
 
-  - vblank间隙信息传送: 在垂直空白间隙中，显示器不会显示影像，影像讯号也不会被显示器给删除步。这一段时间对于设备来说是一个浪费，因此人们想了办法来利用 这一段时间， 电视台可以利用这一时间发送一些不可显示信息，如果您使用过图文电视您就会立刻明白，为什么图文电视卡要接收电视信号，电视卡可以解读这 一信息，而电视不能，这种信息就是利用垂直回扫期发送的，电视卡通过RS-232端口将接收到的不可显示信息传送给计算机，由计算机加以处理，这就是图文电 视的原理，也就是说，电视台利用垂直回扫期发送一些不可显示的信息，而图文电视卡将这种信息接收下来，经过解码发送到计算机内由计算机处理。
+  - vblank间隙信息传送: 在垂直空白间隙中，显示器不会显示影像，影像讯号也不会被显示器给删除步。这一段时间对于设备来说是一个浪费，因此人们想了办法来利用 这一段时间， 电视台可以利用这一时间发送一些不可显示信息， 如果您使用 过图文电视您就会立刻明白，为什么图文电视卡要接收电视信号，电视卡可以解读这 一信息，而电视不能，这种信息就是利用垂直回扫期发送的，电视卡通过RS-232端口将接收到的不可显示 信息传送给计算机，由计算机加以处理， 这就是图文电 视的原理，也就是说，电视台利用垂直回扫期发送一些不可显示的信息，而图文电视卡将这种信息接收下来，经过解码发送到计算机内由计算机处理。
 
 - Presentation模式是交换链配置中最重要的一个，因为它代表了呈现image到屏幕的条件。Vulkan中有4个可能的模式：
   - VK_PRESENT_MODE_IMMEDIATE_KHR ：俗称“立即渲染”，它只用一个framebuffer，渲染操作直接渲染到该缓冲，显示器刷新到来时直接从缓冲中取出 这张图像并显示。 由于显示和渲染是并行执行的，存在渲染未完成时就被显示器取走了， 导致取走的图像中一半是之前的结果，一半是这次未完全渲染的结果， 导致“图像撕裂”。渲染频率大于或小于vblank频率都会造成撕裂。
-  - VK_PRESENT_MODE_FIFO_KHR：垂直同步，交换链是一个队列，显示器刷新时，从队列头部拿一个image，程序将渲染好的image放到队列尾部。如果队列满了程序 必须等待。
+  - VK_PRESENT_MODE_FIFO_KHR：双重缓冲，垂直同步，交换链是一个队列，显示器刷新时，从队列头部拿一个image，程序将渲染好的image放到队列尾部。如果队列满了程序 必须等待。
   - VK_PRESENT_MODE_FIFO_RELAXED_KHR：只有当垂直回归结束后，app晚了，队列空了，这一模式才与上一个模式有所区别。它不等待下一次垂直回归，而是当image 到达 时立即传送。这可能导致可见的撕裂。
-  - VK_PRESENT_MODE_MAILBOX_KHR：第二个模式的另一个变种。队列满时，它不阻塞app，队列中的image直接被新的替换掉。这个模式可以被用于实现三缓存，其允许你 避免撕裂，且大幅减少延迟问题（与双缓存的垂直同步模式相比）
+  - VK_PRESENT_MODE_MAILBOX_KHR：三重缓冲，第二个模式的另一变种。队列满时，它不阻塞app，队列中的image直接被新的替换。这个模式可被用于实现三重缓存，允许你避免撕裂，大幅减少延迟问题（与双缓存的垂直同步模式相比）
 
 
 - 如果支持交换链，会涉及3个扩展：两种源于实例层，另一个就是作用于逻辑设备层的交换链扩展： *VK_KHR_swapchain* 
-  - 第一种是在实例层定义的 *VK_KHR_surface* 扩展。 它描述“平面”对象，即应用窗口的逻辑表现形式。 该扩展支持我们查看平面的不同参数（功能、支持的格式、大小）， 并查询特定物理设备是否支持交换链 （更确切的说，特定队列家族是否支持在特定平面上演示图像）。 这些信息非常实用，因为我们不想选择物理设备并尝试通过它创建 逻辑设备， 来了解它是否支持交换链。 该扩展还可定义破环此类平面的方法。
+  - 第一种是在实例层定义的 *VK_KHR_surface* 扩展。 它描述“平面”对象，即应用窗口的逻辑表现形式。 该扩展支持我们查看平面的不同参数（功能、支持的格式、大小）， 并查询特定物理设备是否支持交换链 （更确切的说，特定队列家族 是否支持在特定平面上演示图像）。 这些信息非常实用，因为我们不想选择物理设备并尝试通过它创建 逻辑设备， 来了解它是否支持交换链。 该扩展还可定义破环此类平面的方法。
   - 第二种实例层扩展依赖于操作系统，*glfwgetrequiredinstanceextensionsll* 返回 *实例层* 用来创建surface的扩展列表，不但有基础的VK_KHR_surface扩展， 还有针对特定操作系统扩展：
     - Windows中称为 VK_KHR_win32_surface
     - Linux中称为 VK_KHR_xlib_surface 或 VK_KHR_xcb_surface
@@ -327,7 +324,13 @@ vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue
     - macOS是 VK_MVK_macos_surface
     - iOS是 VK_MVK_ios_surface
 
-
+#+begin_src c++
+{// querySwapChainSupport  获取surface的 capabilities、formats、presentModes
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
+    vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素用32位表示VK_FORMAT_B8G8R8A8_UNORM、使用SRGB颜色空间 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+    vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式: VK_PRESENT_MODE_IMMEDIATE_KHR、FIFO、FIFO_RELAXED、MAILBOX
+}
+#+end_src
 
 ** VkImageView 和 VkFrameBuffer
 - imageView 引用一个 image 将要被使用的特定部分，Framebuffer 其实就是一堆 VkImageView，framebuffer 引用 imageView ，把它当做 color 、depth 和 stencil 的目标使用。因为 swapchain 里可以有多个 image。

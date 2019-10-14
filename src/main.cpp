@@ -67,7 +67,7 @@ struct QueueFamilyIndices {
 // 仅仅检查交换链是否可用，不够充分，因为它可能和窗口surface不兼容。我们还需要检查这3个属性
 struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;	 // 基础surface功能（交换链包含的image的最大\小数量，image的宽高的最大\最小值）
-    std::vector<VkSurfaceFormatKHR> formats; // Surface格式（像素的格式、使用的颜色空间）, 包含format和colorSpace成员变量。 VK_FORMAT_B8G8R8A8_UNORM像素用32位表示。SRGB颜色空间 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+    std::vector<VkSurfaceFormatKHR> formats; // Surface格式（像素格式、颜色空间）, 包含format和colorSpace成员变量。 VK_FORMAT_B8G8R8A8_UNORM像素用32位表示。SRGB颜色空间 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
     std::vector<VkPresentModeKHR> presentModes; //  可用的presentation模式: VK_PRESENT_MODE_IMMEDIATE_KHR、FIFO、FIFO_RELAXED、MAILBOX
 };
 
@@ -240,7 +240,7 @@ class HelloTriangleApplication {
 
 
         void createLogicalDevice() {
-            QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+            QueueFamilyIndices indices = findQueueFamilies(physicalDevice); // 要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR 检查surface是否支持图片显示。
 
             std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
             std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
@@ -286,14 +286,15 @@ class HelloTriangleApplication {
 
 
         void createSwapChain() {
-            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
+            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);  //获取surface的 capabilities、formats、presentModes
 
-            VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
-            VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-            VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+             // if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+            VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats); // 像素格式和颜色空间：VK_FORMAT_B8G8R8A8_UNORM像素用32位表示。SRGB颜色空间VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+            VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes); //  优先使用VK_PRESENT_MODE_MAILBOX_KHR 三重缓冲
+            VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities); // extent 是SwapChain中image的宽高，分辨率(resolution), 通常它与window的尺寸一样
 
-            // VkSurfaceCapabilitiesKHR包含交换链进行渲染时允许的最大最小的image图像数量， image的宽高的最大/最小值
-            uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1; // 交换链中要有多少个image。简单地使用最小值，在请求另一个image渲染前，可能有时候不得不等待driver完成内部操作。因此推荐至少比最小值多1
+            // VkSurfaceCapabilitiesKHR包含交换链渲染时允许的最大最小的image图像数量， image的宽高的最大/最小值
+            uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1; // 交换链中有多少image。使用最小值，在请求另一个image渲染前，可能有时不得不等待driver完成内部操作。因此推荐至少比最小值多1
             if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) { // 确保不超过image的最大值，而0是个特殊值，意思没限制。
                 imageCount = swapChainSupport.capabilities.maxImageCount;
             }
@@ -302,31 +303,31 @@ class HelloTriangleApplication {
             createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
             createInfo.surface = surface;
 
-            createInfo.minImageCount = imageCount; // 在交换链允许的范围内，请求交换链至少需要提供多少个image
-            createInfo.imageFormat = surfaceFormat.format;
-            createInfo.imageColorSpace = surfaceFormat.colorSpace;
+            createInfo.minImageCount = imageCount; // 交换链至少提供多少个image, 推荐比capabilities的最小值多 1： capabilities.minImageCount + 1;
+            createInfo.imageFormat = surfaceFormat.format; // format指定颜色通道和存储类型，VK_FORMAT_B8G8R8A8_UNORM像素用32位表示
+            createInfo.imageColorSpace = surfaceFormat.colorSpace;  // colorSpace用来表示SRGB颜色空间是否被支持 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
             createInfo.imageExtent = extent;
             createInfo.imageArrayLayers = 1; // 表示image的层次，除非创建3D应用，否则这个值将为1.
-            createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // imageUsage指明Swap Chain里的image我们拿来做什么，在本例中我们将直接对image进行渲染，这就意味着Image将被当做颜色附件使用(color attachment)。如果你想先渲染一个单独的图片然后再进行处理，那就应该使用VK_IMAGE_USAGE_TRANSFER_DST_BIT并使用内存转换操作将渲染好的image 转换到SwapChain里。
+            createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // imageUsage指明Swap Chain里的image我们拿来做什么，在本例中将直接对image进行渲染，这就意味着Image将被当做颜色附件使用(color attachment)。如果你想先渲染一个单独的图片然后再进行处理，那就应该使用VK_IMAGE_USAGE_TRANSFER_DST_BIT并使用内存转换操作将渲染好的image 转换到SwapChain里。
 
-            QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+            QueueFamilyIndices indices = findQueueFamilies(physicalDevice); // 在窗口显示图片，队列要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT和vkGetPhysicalDeviceSurfaceSupportKHR检查surface是否支持图片显示
             uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
 
-            // 如果grapics queue 和 present queue不相同，就会出现这多种队列访问image的情况：我们在grapics queue 中绘制image,然后将它提交到presention queue 去等待显示。
+            // 如果grapics queue 和 present queue不相同，会出现多种队列访问image的情况：我们在grapics queue中绘制image,然后将它提交到presention queue等待显示。
             if (indices.graphicsFamily != indices.presentFamily) {
                 createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT; // VK_SHARING_MODE_CONCURRENT：。Image可以在多个队列家族使用，无需显式地转移所有权。
-                createInfo.queueFamilyIndexCount = 2;					  // 并发模式要求你用queueFamilyIndexCount 和pQueueFamilyIndices 参数，提前标明，所有权将在哪些队列家族中共享。
+                createInfo.queueFamilyIndexCount = 2;  // 并发模式要求你用queueFamilyIndexCount 和pQueueFamilyIndices 参数，提前标明，所有权将在哪些队列家族中共享。
                 createInfo.pQueueFamilyIndices = queueFamilyIndices;
             } else {
-                createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; // VK_SHARING_MODE_EXCLUSIVE：一个image在同一时间只能属于一个队列家族，所有权必须被显式地转移后，才能在另一个队列家族中使用。这个选项提供最佳性能。
+                createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; // VK_SHARING_MODE_EXCLUSIVE：一个image同一时间只能属于一个队列家族，所有权必须被显式地转移后，才能在另一个队列家族使用。这个选项提供最佳性能。
             }
 
-            createInfo.preTransform = swapChainSupport.capabilities.currentTransform; // 这里是不对Image进行变换。 如果某个要支持莫个变换如，90度或水平翻转，我们可以标明让它应用到交换链中的image上。
+            createInfo.preTransform = swapChainSupport.capabilities.currentTransform; // 这里是不对Image进行变换。 如果要支持莫个变换如，90度或水平翻转，可以标明让它应用到交换链中的image上。
             createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // 忽略和其他窗口颜色混合时的Alpha 通道
             createInfo.presentMode = presentMode;
             createInfo.clipped = VK_TRUE;    // 不处理那些被遮盖的像素
 
-            createInfo.oldSwapchain = VK_NULL_HANDLE;
+            createInfo.oldSwapchain = VK_NULL_HANDLE; // 窗口大小改变时，交换链会失效，需要重新创建. 这里要明确指出旧的交换链。
 
             if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
                 throw std::runtime_error("failed to create swap chain!");
@@ -345,7 +346,7 @@ class HelloTriangleApplication {
         VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
             for (const auto& availableFormat : availableFormats) { // VK_FORMAT_B8G8R8A8_UNORM表示以B，G，R和A的顺序，每个颜色通道用8位无符号整型数表示，总共每像素使用32位表示
                 if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-                    return availableFormat; // 对于颜色空间，如果SRGB被支持，就使用SRGB，可以获得更加准确的颜色表示。直接用SRGB有很大挑战，所以使用RGB作为颜色格式，这一格式可以通过VK_FORMAT_B8G8R8A8_UNORM指定。
+                    return availableFormat; // SRGB颜色空间有更好的颜色表现，如果支持就用 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
                 }
             }
 
@@ -364,16 +365,14 @@ class HelloTriangleApplication {
             for (const auto& availablePresentMode : availablePresentModes) {
                 if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) { // 三缓冲更加绝妙(nice)，可以先看看有没有它.
                     return availablePresentMode;
-                } else if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
-                    bestMode = availablePresentMode;
                 }
             }
 
-            return bestMode;
+            return VK_PRESENT_MODE_FIFO_KHR; //现在的显示器，这个应总是有效的。
         }
 
 
-        // extent 是Swap Chain中image的分辨率(resolution) ,通常它与window的尺寸一样，vulkan让我们通过设置currentExtent设置width和height来匹配window的分辨率。
+        // extent 是Swap Chain中image的宽高分辨率(resolution) ,通常它与window的尺寸一样，vulkan让我们通过设置currentExtent设置width和height来匹配window的分辨率。
         // 但有些window Manager会将currentExtent设置为uint32_t的最大值，来表示允许我们设置不同的值，这个时候我们可以从minImageExtent和maxImageExtent中选择最匹配window的尺寸值。
         VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
             if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
@@ -415,22 +414,25 @@ class HelloTriangleApplication {
         }
 
 
-        // 检查设备，是否满足我们的需要，因为不是所有的图形卡都一样。
+        // 要在窗口显示图片，队列要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT 和 vkGetPhysicalDeviceSurfaceSupportKHR 检查surface是否支持图片显示。
+        // 莫个物理设备的所有 *逻辑设备扩展* 确认支持交换链扩展VK_KHR_swapchain
         bool isDeviceSuitable(VkPhysicalDevice device) {
-            QueueFamilyIndices indices = findQueueFamilies(device); // 任何操作，从绘画到上传纹理，都要将命令提交到队列。有不同的队列，这里是选择我们需要的队列。
+            QueueFamilyIndices indices = findQueueFamilies(device); // 在窗口显示图片，队列要支持绘制和呈现：VK_QUEUE_GRAPHICS_BIT 和vkGetPhysicalDeviceSurfaceSupportKHR 检查surface支持图片显示。
 
-            bool extensionsSupported = checkDeviceExtensionSupport(device);
+
+            bool extensionsSupported = checkDeviceExtensionSupport(device); // 确认莫个物理设备支持交换链扩展VK_KHR_swapchain， 要显示图片，这个逻辑实例扩展一定要
+
 
             bool swapChainAdequate = false;
             if (extensionsSupported) {
-                SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+                SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device); //获取surface的 capabilities、formats、presentModes
                 swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
             }
 
             return indices.isComplete() && extensionsSupported && swapChainAdequate;
         }
 
-
+        // 获取莫个物理设备的所有 *逻辑设备扩展* 确认支持交换链扩展VK_KHR_swapchain， 要显示图片，这个逻辑实例扩展一定是要的。
         bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
             uint32_t extensionCount;
             vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
