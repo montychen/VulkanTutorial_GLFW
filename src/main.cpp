@@ -322,20 +322,20 @@ class HelloTriangleApplication {
                 createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; // VK_SHARING_MODE_EXCLUSIVE：一个image同一时间只能属于一个队列家族，所有权必须被显式地转移后，才能在另一个队列家族使用。这个选项提供最佳性能。
             }
 
-            createInfo.preTransform = swapChainSupport.capabilities.currentTransform; // 这里是不对Image进行变换。 如果要支持莫个变换如，90度或水平翻转，可以标明让它应用到交换链中的image上。
-            createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // 忽略和其他窗口颜色混合时的Alpha 通道
+            createInfo.preTransform = swapChainSupport.capabilities.currentTransform; // currentTransform说明交换链里的mage不需要变换。 如果surface支持变换如，90度或水平翻转，可以标明让它应用到交换链中的image
+            createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // 在和其它窗口混合的时候，忽略Alpha透明通道，
             createInfo.presentMode = presentMode;
-            createInfo.clipped = VK_TRUE;    // 不处理那些被遮盖的像素
+            createInfo.clipped = VK_TRUE;    // 不处理那些被遮挡的部分， 可以得到更好的性能
 
-            createInfo.oldSwapchain = VK_NULL_HANDLE; // 窗口大小改变时，交换链会失效，需要重新创建. 这里要明确指出旧的交换链。
+            createInfo.oldSwapchain = VK_NULL_HANDLE; // 窗口大小改变时，交换链会失效，需要重新创建. 这里要明确的指向旧的交换链。
 
             if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
                 throw std::runtime_error("failed to create swap chain!");
             }
 
-            vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
+            vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr); // 交换链在创建的过程中，也会自动创建至少minImageCount个VkImage。
             swapChainImages.resize(imageCount);
-            vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
+            vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data()); // 从交换链中获取已经创建的VkImage
 
             swapChainImageFormat = surfaceFormat.format;
             swapChainExtent = extent;

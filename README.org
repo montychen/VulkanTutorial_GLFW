@@ -164,21 +164,36 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
     vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 }
 
-{// createSwapChain
-// if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-    VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats); // VK_FORMAT_B8G8R8A8_UNORM像素用32位表示。SRGB颜色空间 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
-    VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes); //  优先使用 VK_PRESENT_MODE_MAILBOX_KHR
-    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities); // extent是SwapChain中image的分辨率(resolution), 通常它与window的尺寸一样
+{ // createSwapChain
+    {// querySwapChainSupport(physicalDevice);  获取surface的 capabilities、formats、presentModes
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
+        vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素用32位表示VK_FORMAT_B8G8R8A8_UNORM、使用SRGB颜色空间 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+        vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式: VK_PRESENT_MODE_IMMEDIATE_KHR、FIFO、FIFO_RELAXED、MAILBOX
+    }
+    // if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+    VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats); // 像素格式和颜色空间：VK_FORMAT_B8G8R8A8_UNORM像素用32位表示。SRGB颜色空间VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+    VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes); //  优先使用VK_PRESENT_MODE_MAILBOX_KHR 三重缓冲
+    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities); // extent 是SwapChain中image的宽高，分辨率(resolution), 通常它与window的尺寸一样
 
-    swapchain_createInfo.imageFormat = surfaceFormat.format;
-    swapchain_createInfo.imageColorSpace = surfaceFormat.colorSpace;
-    swapchain_createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // imageUsage指明Swap Chain里的image我们拿来做什么，在本例中我们将直接对image进行渲染，这就意味着Image将被当做颜色附件使用(color attachment)。如果你想先渲染一个单独的图片然后再进行处理，那就应该使用VK_IMAGE_USAGE_TRANSFER_DST_BIT并使用内存转换操作将渲染好的image 转换到SwapChain里。
+    // VkSurfaceCapabilitiesKHR包含交换链渲染时允许的最大最小的image图像数量， image的宽高的最大/最小值
+    uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1; // 交换链中有多少image。使用最小值，在请求另一个image渲染前，可能有时不得不等待driver完成内部操作。因此推荐至少比最小值多1
+
+    swapchain_createInfo.minImageCount = imageCount; // 交换链至少提供多少个image, 推荐比capabilities的最小值多 1： capabilities.minImageCount + 1;
+    swapchain_createInfo.imageFormat = surfaceFormat.format; // format指定颜色通道和存储类型，VK_FORMAT_B8G8R8A8_UNORM像素用32位表示
+    swapchain_createInfo.imageColorSpace = surfaceFormat.colorSpace;  // colorSpace用来表示SRGB颜色空间是否被支持 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+    swapchain_createInfo.imageExtent = extent;
+    swapchain_createInfo.imageArrayLayers = 1; // 表示image的层次，除非创建3D应用，否则这个值将为1.
+    swapchain_createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // imageUsage指明Swap Chain里的image我们拿来做什么，在本例中将直接对image进行渲染，这就意味着Image将被当做颜色附件使用(color attachment)。如果你想先渲染一个单独的图片然后再进行处理，那就应该使用VK_IMAGE_USAGE_TRANSFER_DST_BIT并使用内存转换操作将渲染好的image 转换到SwapChain里。
+    swapchain_createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; // VK_SHARING_MODE_EXCLUSIVE：一个image同一时间只能属于一个队列家族，所有权必须被显式地转移后，才能在另一个队列家族使用。这个选项提供最佳性能。
+
+    swapchain_createInfo.preTransform = swapChainSupport.capabilities.currentTransform; // currentTransform说明交换链里的mage不需要变换。 如果surface支持变换如，90度或水平翻转，可以标明让它应用到交换链中的image
+    swapchain_createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // 在和其它窗口混合的时候，忽略Alpha透明通道，
     swapchain_createInfo.presentMode = presentMode;
+    swapchain_createInfo.clipped = VK_TRUE;    // 不处理那些被遮挡的部分， 可以得到更好的性能
+    swapchain_createInfo.oldSwapchain = VK_NULL_HANDLE; // 窗口大小改变时，交换链会失效，需要重新创建. 这里要明确的指向旧的交换链。
 
-
-    vkCreateSwapchainKHR(device, &swapchain_createInfo, nullptr, &swapChain);
-    vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
-}
+    vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain);
+    vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data()); //  交换链在创建的过程中，也会自动创建至少minImageCount个VkImage。从交换链中获取已经创建的VkImage
 #+end_src
 
 
@@ -299,7 +314,7 @@ vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue
 #+end_src
 
 
-** 设定surface和创建Swapchain
+** 获取surface信息和创建Swapchain
 - 交换链 *VkSwapchainKHR* ：Vulkan 中没有 *默认帧缓冲区 default framebuffer* 的概念。交换链确保当窗口系统在显示一个图像时，应用程序可以准备下一个图像， 保证 image 完全渲染完毕后才能进行显示十分重要。每次我们想绘制一帧时， 我们请求交换链提供给我们一个用于渲染的 image，当这一帧完成绘制后，这个 image 返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。
   
 - vertical blank Interval vblank 垂直同步/垂直空白间隙： 我们通常收看的电视图象是由电子枪发射的电子串高速轰击显象管上的荧光物质而产生的，电子串按 从左至右， 从上至下的方式扫 描整个屏幕， 速度十分快，所以我们 的眼睛 感觉不到，当电子枪的扫描位置从左上角达到右下角时，必须由右下角回到下一 帧的左上角，以进行下一 张画面的显示。 而电子束的移动是需要时间的, 从右下角回到左上角所花费的时间就是垂直空白间隙。
@@ -325,11 +340,36 @@ vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue
     - iOS是 VK_MVK_ios_surface
 
 #+begin_src c++
-{// querySwapChainSupport  获取surface的 capabilities、formats、presentModes
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
-    vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素用32位表示VK_FORMAT_B8G8R8A8_UNORM、使用SRGB颜色空间 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
-    vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式: VK_PRESENT_MODE_IMMEDIATE_KHR、FIFO、FIFO_RELAXED、MAILBOX
-}
+ { // createSwapChain
+     {// querySwapChainSupport(physicalDevice);  获取surface的 capabilities、formats、presentModes
+         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
+         vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素用32位表示VK_FORMAT_B8G8R8A8_UNORM、使用SRGB颜色空间 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+         vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式: VK_PRESENT_MODE_IMMEDIATE_KHR、FIFO、FIFO_RELAXED、MAILBOX
+     }
+     // if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats); // 像素格式和颜色空间：VK_FORMAT_B8G8R8A8_UNORM像素用32位表示。SRGB颜色空间VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes); //  优先使用VK_PRESENT_MODE_MAILBOX_KHR 三重缓冲
+     VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities); // extent 是SwapChain中image的宽高，分辨率(resolution), 通常它与window的尺寸一样
+
+     // VkSurfaceCapabilitiesKHR包含交换链渲染时允许的最大最小的image图像数量， image的宽高的最大/最小值
+     uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1; // 交换链中有多少image。使用最小值，在请求另一个image渲染前，可能有时不得不等待driver完成内部操作。因此推荐至少比最小值多1
+
+     swapchain_createInfo.minImageCount = imageCount; // 交换链至少提供多少个image, 推荐比capabilities的最小值多 1： capabilities.minImageCount + 1;
+     swapchain_createInfo.imageFormat = surfaceFormat.format; // format指定颜色通道和存储类型，VK_FORMAT_B8G8R8A8_UNORM像素用32位表示
+     swapchain_createInfo.imageColorSpace = surfaceFormat.colorSpace;  // colorSpace用来表示SRGB颜色空间是否被支持 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+     swapchain_createInfo.imageExtent = extent;
+     swapchain_createInfo.imageArrayLayers = 1; // 表示image的层次，除非创建3D应用，否则这个值将为1.
+     swapchain_createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // imageUsage指明Swap Chain里的image我们拿来做什么，在本例中将直接对image进行渲染，这就意味着Image将被当做颜色附件使用(color attachment)。如果你想先渲染一个单独的图片然后再进行处理，那就应该使用VK_IMAGE_USAGE_TRANSFER_DST_BIT并使用内存转换操作将渲染好的image 转换到SwapChain里。
+     swapchain_createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; // VK_SHARING_MODE_EXCLUSIVE：一个image同一时间只能属于一个队列家族，所有权必须被显式地转移后，才能在另一个队列家族使用。这个选项提供最佳性能。
+
+     swapchain_createInfo.preTransform = swapChainSupport.capabilities.currentTransform; // currentTransform说明交换链里的mage不需要变换。 如果surface支持变换如，90度或水平翻转，可以标明让它应用到交换链中的image
+     swapchain_createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // 在和其它窗口混合的时候，忽略Alpha透明通道，
+     swapchain_createInfo.presentMode = presentMode;
+     swapchain_createInfo.clipped = VK_TRUE;    // 不处理那些被遮挡的部分， 可以得到更好的性能
+     swapchain_createInfo.oldSwapchain = VK_NULL_HANDLE; // 窗口大小改变时，交换链会失效，需要重新创建. 这里要明确的指向旧的交换链。
+
+     vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain);
+     vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data()); //  交换链在创建的过程中，也会自动创建至少minImageCount个VkImage。从交换链中获取已经创建的VkImage
 #+end_src
 
 ** VkImageView 和 VkFrameBuffer
