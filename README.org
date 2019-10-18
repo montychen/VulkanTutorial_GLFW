@@ -373,8 +373,11 @@ vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue
 #+end_src
 
 ** VkImageView 和 VkFrameBuffer
-- imageView 引用一个 image 将要被使用的特定部分，Framebuffer 其实就是一堆 VkImageView，framebuffer 引用 imageView ，把它当做 color 、depth 和 stencil 的目标使用。因为 swapchain 里可以有多个 image。
-- Frame buffer 帧缓冲区封装了 color buffer image 和 depth buffer image。其中 color buffer image 为从 swap chain 获取的 image，frame buffer 的创建个数需要跟 swap chain 的 image 的数量对应.
+- ImageView描述了如何访问Image以及访问图像的哪一部分，要在渲染管道中使用任何VkImage（包括交换链中的VkImage），必须创建一个VkImageView对象。
+- Framebuffer 其实就是一堆VkImageView，framebuffer引用imageView ，把它当做color、depth和stencil的目标使用。因为swapchain里可以有多个image。framebuffer的创建个数需要跟swapchain里image的数量对应.
+
+- mipmap: 在三维世界中,显示一张图的大小与摄象机机距离模型的远近位置有关,近的地方,图片实际象素就大一些,远的地方图片实际象素就会小一些。 当摄像机较远的时候，用精细的贴图玩家也看不见，而且还浪费资源，此时完全可以进行一些压缩用更小的贴图 ,Mipmap纹理技术是目前解决纹理分辨率与视点距离关系的最有效途径,它会先将图片压缩成很多逐渐缩小的图片,例如一张64*64的图片,会产生64*64,32*32,16*16,8*8,4*4,2*2,1*1的7张图片,当屏幕上 需要绘制像素点 为20*20 时，程序只是利用 32*32 和 16*16 这两张图片来计算出即将显示为 20*20 大小的一个图片，这比单独利用 32*32 的那张原始片计算出来的图片效果要好得多，速度也更快.
+
 
 ** 创建渲染通道 Render pass，它标明渲染目标和用法
 - render layer 是把不同的物体放到不同的 layer 层里去渲染，比如前景放到一层，背景放到一层，所以每个层里渲染出来的图像包括的物体的所有信息。比如物体的高光，颜色，反光，阴影等等都在一个层里。
