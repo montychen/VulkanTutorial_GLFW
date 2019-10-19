@@ -99,6 +99,8 @@ class HelloTriangleApplication {
         std::vector<VkImage> swapChainImages;
         VkFormat swapChainImageFormat;
         VkExtent2D swapChainExtent;
+        std::vector<VkImageView> swapChainImageViews;
+
 
         void initWindow(){
             glfwInit();
@@ -117,6 +119,7 @@ class HelloTriangleApplication {
             pickPhysicalDevice();
             createLogicalDevice();
             createSwapChain();
+            createImageViews();
         }
 
         void mainLoop() {
@@ -288,7 +291,7 @@ class HelloTriangleApplication {
         void createSwapChain() {
             SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);  //获取surface的 capabilities、formats、presentModes
 
-             // if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+            // if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
             VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats); // 像素格式和颜色空间：VK_FORMAT_B8G8R8A8_UNORM像素用32位表示。SRGB颜色空间VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
             VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes); //  优先使用VK_PRESENT_MODE_MAILBOX_KHR 三重缓冲
             VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities); // extent 是SwapChain中image的宽高，分辨率(resolution), 通常它与window的尺寸一样
@@ -341,7 +344,30 @@ class HelloTriangleApplication {
             swapChainExtent = extent;
         }
 
+        void createImageViews() {
+            swapChainImageViews.resize(swapChainImages.size());
 
+            for (size_t i = 0; i < swapChainImages.size(); i++) { //  为交换链中每个图像创建一个ImageView
+                VkImageViewCreateInfo createInfo = {};
+                createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+                createInfo.image = swapChainImages[i];
+                createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // 将图像视为1D纹理，2D纹理，3D纹理 、立方体贴图
+                createInfo.format = swapChainImageFormat;    // VK_FORMAT_B8G8R8A8_UNORM
+                createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY; // components允许你将颜色通道混合起来，比如，将所有通道都映射到红色通道，形成单色材质。我们这里用默认映射, 不用任何mipmap层级
+                createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+                createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+                createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+                createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // subresourceRange描述了图像的用途以及哪些部分能被访问，我们的图像被用作颜色目标
+                createInfo.subresourceRange.baseMipLevel = 0;    // 一系列mipmap缩略图的编号即为 mip level。level 0为原图, 之后的每一个level 都比上一个level长宽缩减到一半
+                createInfo.subresourceRange.levelCount = 1;
+                createInfo.subresourceRange.baseArrayLayer = 0;
+                createInfo.subresourceRange.layerCount = 1; // 如果开发3D应用，那么要创建具有多层的交换链。然后你可以为每个图像创建多个图像视图，通过访问不同的层来表示左右眼的视图
+
+                if (vkCreateImageView(device, &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS) {
+                    throw std::runtime_error("failed to create image views!");
+                }
+            }
+        }
 
         VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
             for (const auto& availableFormat : availableFormats) { // VK_FORMAT_B8G8R8A8_UNORM表示以B，G，R和A的顺序，每个颜色通道用8位无符号整型数表示，总共每像素使用32位表示
