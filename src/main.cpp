@@ -130,6 +130,10 @@ class HelloTriangleApplication {
         }
 
         void cleanup() {
+            for (auto imageView : swapChainImageViews) {
+                vkDestroyImageView(device, imageView, nullptr);
+            }
+
             vkDestroySwapchainKHR(device, swapChain, nullptr);
             vkDestroyDevice(device, nullptr);
 
@@ -353,11 +357,11 @@ class HelloTriangleApplication {
                 createInfo.image = swapChainImages[i];
                 createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // 将图像视为1D纹理，2D纹理，3D纹理 、立方体贴图
                 createInfo.format = swapChainImageFormat;    // VK_FORMAT_B8G8R8A8_UNORM
-                createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY; // components允许你将颜色通道混合起来，比如，将所有通道都映射到红色通道，形成单色材质。我们这里用默认映射, 不用任何mipmap层级
+                createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY; // components允许你将颜色通道混合起来，比如，将所有通道都映射到红色通道，形成单色材质。我们这里用默认映射
                 createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
                 createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
                 createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-                createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // subresourceRange描述了图像的用途以及哪些部分能被访问，我们的图像被用作颜色目标
+                createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // subresourceRange描述图像用途以及哪些部分能被访问，我们的图像被用作颜色目标，不用任何mipmap层级
                 createInfo.subresourceRange.baseMipLevel = 0;    // 一系列mipmap缩略图的编号即为 mip level。level 0为原图, 之后的每一个level 都比上一个level长宽缩减到一半
                 createInfo.subresourceRange.levelCount = 1;
                 createInfo.subresourceRange.baseArrayLayer = 0;
