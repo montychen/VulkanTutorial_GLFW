@@ -76,146 +76,21 @@ make   #编译
 在有一些场景中，我们将观察到，OpenGL 和 Vulkan 之间在性能方面没有任何差别。 如果不需要多线程化，或应用不是 *CPU 密集型* （渲染的场景不太复杂），使用 OpenGL 即可，而且使用 Vulkan  不会实现性能提升 （但可能会 *降低功耗， 这对移动设备至关重要* ）。 但如果我们想最大限度地发挥图形硬件的功能，Vulkan 将是最佳选择。
 
 
-* Vulkan 初始化流程 ：
-
-1) vkCreateInstance()： VkInstanceCreateInfo +  VkApplicationInfo  创建实例
-2) vkCreateDebugUtilsMessengerEXT：VK_LAYER_KHRONOS_validation默认在终端输出所有验证层的调试信息。启用实例扩展VK_EXT_debug_utils后， 自定义一个回调函数，输出我们感兴趣的信息。
-3) glfwCreateWindowSurface：窗口 surface 需要在 instance 被创建后立即被创建，因为它实际上会影响物理设备的选择。
-
-4) vkEnumeratePhysicalDevices() -> vkGetPhysicalDeviceQueueFamilyProperties() 根据合适的队列簇，选择物理设备, 为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
-5) vkCreateDevice(): VkDeviceCreateInfo + VkDeviceQueueCreateInfo  创建逻辑设备、队列随着逻辑设备的创建而自动创建。
-
-6) vkCreateSwapchainKHR()
-7) vkCreateImageView(): 为了使用 VkImage,不管是在 SwapChain 还是在 Pipeline 中，都必须先创建 VkImageView, 它是 image 的一个 view，描述了我们如何访问 image、访问 image 的哪一部分等。
-8) : vkCreateShaderModule() 在 Vulkan 中，图形管线几乎完全不允许进行动态设置，如果我们 想使用其它着色器，绑定其它帧缓冲，以及改变混合函数，都需要重新创 建管线。这就迫使我们必须提前创建所有我们需要使用的图形管线，虽然 这样看起来不太方便，但这给驱动程序带来了很大的优化空间。
+* Buffer和内存 & 数据传输
+- 创建Buffer之前都要先申请分配相应的内存，因为无论是Texture、VertexBuffer、IndexBuffer或者UniformBuffer等等，其实都最终都是一段内存，因此Vulkan将这些资源都视为Buffer。创建Buffer 时就需要指定 Buffer的大小、用途、共享模式等等。
+- 由于在GPU中需要内存对齐，因此我们的Buffer大小与实际内存可能并不一致。为了获取不同资源对应的内存对齐大小以及需要实际分配的内存大小，Vulkan提供了vkGetBufferMemoryRequirements函数供我们使用。分配好内存之后，就可以将 Buffer和内存绑定到一起。
+- 高速缓存具有最高的访问速度。其次就是访问各自独占的存储，而最慢的就是访问共享内存了，当然对于CPU来说访问共享内存与自己独占的内存在性能是基本没有差异的。这里的性能差异主要是从GPU的角度来说的。因此我们肯定愿意将一些CPU或GPU专有 的数据首先考虑放在各自的独占存储中，其次需要多方来访问的数据就放在共享内存中。
+- 说了这么废话，就是为了给数据传输做铺垫。对于UniformBuffer，我们可能更希望将它放置于共享内存中，对于Texture、Vertex、Index等等我们更希望将它们放置于GPU的独立内存中。因此，对于UniformBuffer， 我们只需要在共享内存或者高速缓存上面分配内存，绑定到Buffer。对于其它数据，我们则需要先在共享内存或者高速缓存上分配临时内存，绑定临时Buffer，然后将数据拷贝至于该块内存，最后则创建真正的Buffer以及在GPU上分配独立的内存，通过 Transfer Command将数据从共享内存或者高速缓存拷贝至GPU内存。
 
 
+* Vulkan的大体流程：
 #+ATTR_latex: :width 800
 #+ATTR_HTML: :width 800
 #+ATTR_ORG: :width 800
-[[file:vulkan_pipeline.png]]
+[[file:vulkan_program_flow.jpg]]
 
 
-vkCreateInstance() → vkEnumeratePhysicalDevices() → vkCreateDevice()
-vkEnumerateInstanceExtensionProperties()  // 为了在创建 instance 前检索支持的扩展 VkExtensionProperties
 
-vkEnumerateInstanceLayerProperties 函数列出所有可以用的层
-vkGetPhysicalDeviceFeatures
-vkGetPhysicalDeviceProperties
-vkGetPhysicalDeviceMemoryProperties
-
-
-* example code
-#+begin_src c++
-vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data()); // 创建实例前，先获取所有可以用于实例的扩展， 确认所有想要的扩展都是存在的。 然后再在VkInstanceCreateInfo中请求启用。
-vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); // 创建实例前，获得所有可用实例层的验证, 确认所有想要的验证都是存在的， 再在VkInstanceCreateInfo中请求启用。 常用的是：VK_LAYER_KHRONOS_validation， 检查看看它是否存在， 它是一个大的验证层集合， 系统把所 有标准常用的验证层都融合在一起。
-// getRequiredExtensions
-glfwGetRequiredInstanceExtensions(&glfwExtensionCount); //  返回实例层用来创建surface的扩展列表，不但有基础的 VK_KHR_surface扩展， 还有针对特定操作系统扩展， macOS是 VK_MVK_macos_surface
-
-// 实例层验证VK_LAYER_KHRONOS_validation默认在终端输出所有验证信息。可以启用实例扩展VK_EXT_debug_utils，然后自定义一个回调函数，就可只输出我们感兴趣的信息。
-instance_createInfo.ppEnabledExtensionNames = extensions.data(); // 包含3个扩展 VK_KHR_surface, VK_MVK_macos_surface,  VK_EXT_debug_utils
-instance_createInfo.ppEnabledLayerNames = validationLayers.data(); // VK_LAYER_KHRONOS_validation, 它是一个大的验证层集合，系统把所有标准常用的验证层，都融合在一起。
-populateDebugMessengerCreateInfo(debugmsg_CreateInfo);  // 设置接收消息的回调函数pfnUserCallback，要输出的信息类型：warning, error...触发回调的事件类型：validation, performance...
-instance_createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugmsg_CreateInfo; // 把pNext设为debugmsg_CreateInfo，vkCreateDebugUtilsMessengerEXT和 vkDestroyDebugUtilsMessengerEXT 就可共用下面的debugMessenger实例。
-vkCreateInstance(&createInfo, nullptr, &instance) // 创建实例，实例层扩展和验证，要在VkInstanceCreateInfo实例创建信息中请求启用。
-
-// setupDebugMessenger   生成函数vkCreateDebugUtilsMessengerEXT 和 vkDestroyDebugUtilsMessengerEXT 共用的VkDebugUtilsMessengerEXT实例
-VkDebugUtilsMessengerEXT debugMessenger;
-vkCreateDebugUtilsMessengerEXT(instance, &debugmsg_CreateInfo, nullptr, &debugMessenger); // 生成VkDebugUtilsMessengerEXT的实例。
-
-// createSurface, 创建surface 需要在 instance 被创建后立即被创建，因为它实际上会影响物理设备的选择。
-glfwCreateWindowSurface(instance, window, nullptr, &surface);
-
-{// pickPhysicalDevice
-
-    vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
-    { // isDeviceSuitable
-        {
-            vkGetPhysicalDeviceProperties(gup, &gpuProperties); // 查询物理设备的属性：支持的Vulkan API版本、设备名称和类型（集成或专用/独立GPU）、厂商ID和限制。
-            vkGetPhysicalDeviceFeatures(gpu, &gpuFeatures); // 获取物理设备的可选特性，如：是否支持geometryShaderh或者tessellationShader，纹理压缩、64位浮点数和多视口渲染
-            if(gpuProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && gpuFeatures.geometryShader);  // 是否独立显卡和支持几何着色器
-
-            // findQueueFamilies,  为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
-            vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies.data());  //获取物理设备的 队列属性
-            if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT);  // 现在我们将只查找支持图形命令的队列
-            vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); // 以某个物理设备，的某个队列家族索引和surface为参数。 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
-        }
-
-        //checkDeviceExtensionSupport 获取莫个物理设备的所有 *逻辑设备扩展* 确认支持交换链扩展VK_KHR_swapchain， 要显示图片，这个逻辑设备扩展一定要
-        vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data());
-
-        { // querySwapChainSupport   //获取surface的 capabilities、formats、presentModes
-            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
-            vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素格式，颜色空间）
-            vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式
-        }
-    }}
-
-{// createLogicalDevice
-    queueCreateInfo.queueFamilyIndex = selected_queuefamily_index;  // 想要启用的队列家族索引（通过它创建队列）, 队列在设备创建时会一同自动创建。
-    queueCreateInfo.queueCount = 1; //我们希望在特定队列家族中启用的队列数量
-    device_createInfo.pQueueCreateInfos = queueCreateInfos.data();
-    createInfo.pEnabledFeatures = &deviceFeatures; // 希望启用的 vkGetPhysicalDeviceFeatures 特性， 比如几何着色器。
-
-    device_createInfo.ppEnabledExtensionNames = deviceExtensions.data(); //启用逻辑设备交换链扩展VK_KHR_swapchain，显示图片这个一定要。deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME }
-    vkCreateDevice(gpu, &device_createInfo, nullptr, &device);  // 队列随着逻辑设备的创建而自动创建
-
-    vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue); // 从队列家族获取队列句柄，保存在graphicsQueue。因为我们只创建一个队列，用索引0即可。
-    vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
-}
-
-{ // createSwapChain
-    {// querySwapChainSupport(physicalDevice);  获取surface的 capabilities、formats、presentModes
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
-        vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素用32位表示VK_FORMAT_B8G8R8A8_UNORM、使用SRGB颜色空间 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
-        vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式: VK_PRESENT_MODE_IMMEDIATE_KHR、FIFO、FIFO_RELAXED、MAILBOX
-    }
-    // if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-    VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats); // 像素格式和颜色空间：VK_FORMAT_B8G8R8A8_UNORM像素用32位表示。SRGB颜色空间VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
-    VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes); //  优先使用VK_PRESENT_MODE_MAILBOX_KHR 三重缓冲
-    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities); // extent 是SwapChain中image的宽高，分辨率(resolution), 通常它与window的尺寸一样
-
-    // VkSurfaceCapabilitiesKHR包含交换链渲染时允许的最大最小的image图像数量， image的宽高的最大/最小值
-    uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1; // 交换链中有多少image。使用最小值，在请求另一个image渲染前，可能有时不得不等待driver完成内部操作。因此推荐至少比最小值多1
-
-    swapchain_createInfo.minImageCount = imageCount; // 交换链至少提供多少个image, 推荐比capabilities的最小值多 1： capabilities.minImageCount + 1;
-    swapchain_createInfo.imageFormat = surfaceFormat.format; // format指定颜色通道和存储类型，VK_FORMAT_B8G8R8A8_UNORM像素用32位表示
-    swapchain_createInfo.imageColorSpace = surfaceFormat.colorSpace;  // colorSpace用来表示SRGB颜色空间是否被支持 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
-    swapchain_createInfo.imageExtent = extent;
-    swapchain_createInfo.imageArrayLayers = 1; // 表示image的层次，除非创建3D应用，否则这个值将为1.
-    swapchain_createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // imageUsage指明Swap Chain里的image我们拿来做什么，在本例中将直接对image进行渲染，这就意味着Image将被当做颜色附件使用(color attachment)。如果你想先渲染一个单独的图片然后再进行处理，那就应该使用VK_IMAGE_USAGE_TRANSFER_DST_BIT并使用内存转换操作将渲染好的image 转换到SwapChain里。
-    swapchain_createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; // VK_SHARING_MODE_EXCLUSIVE：一个image同一时间只能属于一个队列家族，所有权必须被显式地转移后，才能在另一个队列家族使用。这个选项提供最佳性能。
-
-    swapchain_createInfo.preTransform = swapChainSupport.capabilities.currentTransform; // currentTransform说明交换链里的mage不需要变换。 如果surface支持变换如，90度或水平翻转，可以标明让它应用到交换链中的image
-    swapchain_createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // 在和其它窗口混合的时候，忽略Alpha透明通道，
-    swapchain_createInfo.presentMode = presentMode;
-    swapchain_createInfo.clipped = VK_TRUE;    // 不处理那些被遮挡的部分， 可以得到更好的性能
-    swapchain_createInfo.oldSwapchain = VK_NULL_HANDLE; // 窗口大小改变时，交换链会失效，需要重新创建. 这里要明确的指向旧的交换链。
-
-    vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain);
-    vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data()); //  交换链在创建的过程中，也会自动创建至少minImageCount个VkImage。从交换链中获取已经创建的VkImage
-}
-
-{ //createImageViews   - ImageView描述了如何访问Image以及访问图像的哪一部分，要在渲染管道中使用任何VkImage（包括交换链中的VkImage），必须创建一个VkImageView对象。
-    for (size_t i = 0; i < swapChainImages.size(); i++) { //  为交换链中每个图像创建一个ImageView
-        VkImageViewCreateInfo createInfo = {};
-        createInfo.image = swapChainImages[i];
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // 将图像视为1D纹理，2D纹理，3D纹理 、立方体贴图
-        createInfo.format = swapChainImageFormat;    // VK_FORMAT_B8G8R8A8_UNORM
-        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY; // components允许你将颜色通道混合起来，比如，将所有通道都映射到红色通道，形成单色材质。我们这里用默认映射
-        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // subresourceRange描述图像用途以及哪些部分能被访问，我们的图像被用作颜色目标，不用任何mipmap层级
-        createInfo.subresourceRange.baseMipLevel = 0;    // 一系列mipmap缩略图的编号即为 mip level。level 0为原图, 之后的每一个level 都比上一个level长宽缩减到一半
-        createInfo.subresourceRange.levelCount = 1;
-        createInfo.subresourceRange.baseArrayLayer = 0;
-        createInfo.subresourceRange.layerCount = 1; // 如果开发3D应用，那么要创建具有多层的交换链。然后你可以为每个图像创建多个图像视图，通过访问不同的层来表示左右眼的视图
-
-        vkCreateImageView(device, &createInfo, nullptr, &swapChainImageViews[i]);
-    }
-}
-#+end_src
 
 
 * 初始化过程涉及的对象
@@ -443,19 +318,146 @@ color attachment 为从 swap chain 获取的 image，depth/stencil attachment �
 ** 渲染一帧：请求 image，提交正确的绘制命令缓存，将 image 返回到交换链
 
 
+* example code
+#+begin_src c++
+vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data()); // 创建实例前，先获取所有可以用于实例的扩展， 确认所有想要的扩展都是存在的。 然后再在VkInstanceCreateInfo中请求启用。
+vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); // 创建实例前，获得所有可用实例层的验证, 确认所有想要的验证都是存在的， 再在VkInstanceCreateInfo中请求启用。 常用的是：VK_LAYER_KHRONOS_validation， 检查看看它是否存在， 它是一个大的验证层集合， 系统把所 有标准常用的验证层都融合在一起。
+// getRequiredExtensions
+glfwGetRequiredInstanceExtensions(&glfwExtensionCount); //  返回实例层用来创建surface的扩展列表，不但有基础的 VK_KHR_surface扩展， 还有针对特定操作系统扩展， macOS是 VK_MVK_macos_surface
 
-* Buffer和内存 & 数据传输
-- 创建Buffer之前都要先申请分配相应的内存，因为无论是Texture、VertexBuffer、IndexBuffer或者UniformBuffer等等，其实都最终都是一段内存，因此Vulkan将这些资源都视为Buffer。创建Buffer 时就需要指定 Buffer的大小、用途、共享模式等等。
-- 由于在GPU中需要内存对齐，因此我们的Buffer大小与实际内存可能并不一致。为了获取不同资源对应的内存对齐大小以及需要实际分配的内存大小，Vulkan提供了vkGetBufferMemoryRequirements函数供我们使用。分配好内存之后，就可以将 Buffer于内存绑定到一起。
-- 高速缓存具有最高的访问速度。其次就是访问各自独占的存储，而最慢的就是访问共享内存了，当然对于CPU来说访问共享内存与自己独占的内存在性能是基本没有差异的。这里的性能差异主要是从GPU的角度来说的。因此我们肯定愿意将一些CPU或GPU专有 的数据首先考虑放在各自的独占存储中，其次需要多方来访问的数据就放在共享内存中。
-- 说了这么废话，就是为了给数据传输做铺垫。对于UniformBuffer，我们可能更希望将它放置于共享内存中，对于Texture、Vertex、Index等等我们更希望将它们放置于GPU的独立内存中。因此，对于UniformBuffer， 我们只需要在共享内存或者高速缓存上面分配内存，绑定到Buffer。对于其它数据，我们则需要先在共享内存或者高速缓存上分配临时内存，绑定临时Buffer，然后将数据拷贝至于该块内存，最后则创建真正的Buffer以及在GPU上分配独立的内存，通过 Transfer Command将数据从共享内存或者高速缓存拷贝至GPU内存。
+// 实例层验证VK_LAYER_KHRONOS_validation默认在终端输出所有验证信息。可以启用实例扩展VK_EXT_debug_utils，然后自定义一个回调函数，就可只输出我们感兴趣的信息。
+instance_createInfo.ppEnabledExtensionNames = extensions.data(); // 包含3个扩展 VK_KHR_surface, VK_MVK_macos_surface,  VK_EXT_debug_utils
+instance_createInfo.ppEnabledLayerNames = validationLayers.data(); // VK_LAYER_KHRONOS_validation, 它是一个大的验证层集合，系统把所有标准常用的验证层，都融合在一起。
+populateDebugMessengerCreateInfo(debugmsg_CreateInfo);  // 设置接收消息的回调函数pfnUserCallback，要输出的信息类型：warning, error...触发回调的事件类型：validation, performance...
+instance_createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugmsg_CreateInfo; // 把pNext设为debugmsg_CreateInfo，vkCreateDebugUtilsMessengerEXT和 vkDestroyDebugUtilsMessengerEXT 就可共用下面的debugMessenger实例。
+vkCreateInstance(&createInfo, nullptr, &instance) // 创建实例，实例层扩展和验证，要在VkInstanceCreateInfo实例创建信息中请求启用。
+
+// setupDebugMessenger   生成函数vkCreateDebugUtilsMessengerEXT 和 vkDestroyDebugUtilsMessengerEXT 共用的VkDebugUtilsMessengerEXT实例
+VkDebugUtilsMessengerEXT debugMessenger;
+vkCreateDebugUtilsMessengerEXT(instance, &debugmsg_CreateInfo, nullptr, &debugMessenger); // 生成VkDebugUtilsMessengerEXT的实例。
+
+// createSurface, 创建surface 需要在 instance 被创建后立即被创建，因为它实际上会影响物理设备的选择。
+glfwCreateWindowSurface(instance, window, nullptr, &surface);
+
+{// pickPhysicalDevice
+
+    vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
+    { // isDeviceSuitable
+        {
+            vkGetPhysicalDeviceProperties(gup, &gpuProperties); // 查询物理设备的属性：支持的Vulkan API版本、设备名称和类型（集成或专用/独立GPU）、厂商ID和限制。
+            vkGetPhysicalDeviceFeatures(gpu, &gpuFeatures); // 获取物理设备的可选特性，如：是否支持geometryShaderh或者tessellationShader，纹理压缩、64位浮点数和多视口渲染
+            if(gpuProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && gpuFeatures.geometryShader);  // 是否独立显卡和支持几何着色器
+
+            // findQueueFamilies,  为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
+            vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queueFamilyCount, queueFamilies.data());  //获取物理设备的 队列属性
+            if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT);  // 现在我们将只查找支持图形命令的队列
+            vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); // 以某个物理设备，的某个队列家族索引和surface为参数。 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
+        }
+
+        //checkDeviceExtensionSupport 获取莫个物理设备的所有 *逻辑设备扩展* 确认支持交换链扩展VK_KHR_swapchain， 要显示图片，这个逻辑设备扩展一定要
+        vkEnumerateDeviceExtensionProperties(gpu, nullptr, &extensionCount, availableExtensions.data());
+
+        { // querySwapChainSupport   //获取surface的 capabilities、formats、presentModes
+            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
+            vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素格式，颜色空间）
+            vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式
+        }
+    }}
+
+{// createLogicalDevice
+    queueCreateInfo.queueFamilyIndex = selected_queuefamily_index;  // 想要启用的队列家族索引（通过它创建队列）, 队列在设备创建时会一同自动创建。
+    queueCreateInfo.queueCount = 1; //我们希望在特定队列家族中启用的队列数量
+    device_createInfo.pQueueCreateInfos = queueCreateInfos.data();
+    createInfo.pEnabledFeatures = &deviceFeatures; // 希望启用的 vkGetPhysicalDeviceFeatures 特性， 比如几何着色器。
+
+    device_createInfo.ppEnabledExtensionNames = deviceExtensions.data(); //启用逻辑设备交换链扩展VK_KHR_swapchain，显示图片这个一定要。deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME }
+    vkCreateDevice(gpu, &device_createInfo, nullptr, &device);  // 队列随着逻辑设备的创建而自动创建
+
+    vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue); // 从队列家族获取队列句柄，保存在graphicsQueue。因为我们只创建一个队列，用索引0即可。
+    vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
+}
+
+{ // createSwapChain
+    {// querySwapChainSupport(physicalDevice);  获取surface的 capabilities、formats、presentModes
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
+        vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素用32位表示VK_FORMAT_B8G8R8A8_UNORM、使用SRGB颜色空间 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+        vkGetPhysicalDeviceSurfacePresentModesKHR(gpu, surface, &presentModeCount, details.presentModes.data()); // 可用的presentation模式: VK_PRESENT_MODE_IMMEDIATE_KHR、FIFO、FIFO_RELAXED、MAILBOX
+    }
+    // if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+    VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats); // 像素格式和颜色空间：VK_FORMAT_B8G8R8A8_UNORM像素用32位表示。SRGB颜色空间VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+    VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes); //  优先使用VK_PRESENT_MODE_MAILBOX_KHR 三重缓冲
+    VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities); // extent 是SwapChain中image的宽高，分辨率(resolution), 通常它与window的尺寸一样
+
+    // VkSurfaceCapabilitiesKHR包含交换链渲染时允许的最大最小的image图像数量， image的宽高的最大/最小值
+    uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1; // 交换链中有多少image。使用最小值，在请求另一个image渲染前，可能有时不得不等待driver完成内部操作。因此推荐至少比最小值多1
+
+    swapchain_createInfo.minImageCount = imageCount; // 交换链至少提供多少个image, 推荐比capabilities的最小值多 1： capabilities.minImageCount + 1;
+    swapchain_createInfo.imageFormat = surfaceFormat.format; // format指定颜色通道和存储类型，VK_FORMAT_B8G8R8A8_UNORM像素用32位表示
+    swapchain_createInfo.imageColorSpace = surfaceFormat.colorSpace;  // colorSpace用来表示SRGB颜色空间是否被支持 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+    swapchain_createInfo.imageExtent = extent;
+    swapchain_createInfo.imageArrayLayers = 1; // 表示image的层次，除非创建3D应用，否则这个值将为1.
+    swapchain_createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // imageUsage指明Swap Chain里的image我们拿来做什么，在本例中将直接对image进行渲染，这就意味着Image将被当做颜色附件使用(color attachment)。如果你想先渲染一个单独的图片然后再进行处理，那就应该使用VK_IMAGE_USAGE_TRANSFER_DST_BIT并使用内存转换操作将渲染好的image 转换到SwapChain里。
+    swapchain_createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; // VK_SHARING_MODE_EXCLUSIVE：一个image同一时间只能属于一个队列家族，所有权必须被显式地转移后，才能在另一个队列家族使用。这个选项提供最佳性能。
+
+    swapchain_createInfo.preTransform = swapChainSupport.capabilities.currentTransform; // currentTransform说明交换链里的mage不需要变换。 如果surface支持变换如，90度或水平翻转，可以标明让它应用到交换链中的image
+    swapchain_createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // 在和其它窗口混合的时候，忽略Alpha透明通道，
+    swapchain_createInfo.presentMode = presentMode;
+    swapchain_createInfo.clipped = VK_TRUE;    // 不处理那些被遮挡的部分， 可以得到更好的性能
+    swapchain_createInfo.oldSwapchain = VK_NULL_HANDLE; // 窗口大小改变时，交换链会失效，需要重新创建. 这里要明确的指向旧的交换链。
+
+    vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain);
+    vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data()); //  交换链在创建的过程中，也会自动创建至少minImageCount个VkImage。从交换链中获取已经创建的VkImage
+}
+
+{ //createImageViews   - ImageView描述了如何访问Image以及访问图像的哪一部分，要在渲染管道中使用任何VkImage（包括交换链中的VkImage），必须创建一个VkImageView对象。
+    for (size_t i = 0; i < swapChainImages.size(); i++) { //  为交换链中每个图像创建一个ImageView
+        VkImageViewCreateInfo createInfo = {};
+        createInfo.image = swapChainImages[i];
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; // 将图像视为1D纹理，2D纹理，3D纹理 、立方体贴图
+        createInfo.format = swapChainImageFormat;    // VK_FORMAT_B8G8R8A8_UNORM
+        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY; // components允许你将颜色通道混合起来，比如，将所有通道都映射到红色通道，形成单色材质。我们这里用默认映射
+        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // subresourceRange描述图像用途以及哪些部分能被访问，我们的图像被用作颜色目标，不用任何mipmap层级
+        createInfo.subresourceRange.baseMipLevel = 0;    // 一系列mipmap缩略图的编号即为 mip level。level 0为原图, 之后的每一个level 都比上一个level长宽缩减到一半
+        createInfo.subresourceRange.levelCount = 1;
+        createInfo.subresourceRange.baseArrayLayer = 0;
+        createInfo.subresourceRange.layerCount = 1; // 如果开发3D应用，那么要创建具有多层的交换链。然后你可以为每个图像创建多个图像视图，通过访问不同的层来表示左右眼的视图
+
+        vkCreateImageView(device, &createInfo, nullptr, &swapChainImageViews[i]);
+    }
+}
+#+end_src
 
 
-* 基本的Vulkan编程流程：
+* Vulkan 初始化流程 ：
+
+1) vkCreateInstance()： VkInstanceCreateInfo +  VkApplicationInfo  创建实例
+2) vkCreateDebugUtilsMessengerEXT：VK_LAYER_KHRONOS_validation默认在终端输出所有验证层的调试信息。启用实例扩展VK_EXT_debug_utils后， 自定义一个回调函数，输出我们感兴趣的信息。
+3) glfwCreateWindowSurface：窗口 surface 需要在 instance 被创建后立即被创建，因为它实际上会影响物理设备的选择。
+
+4) vkEnumeratePhysicalDevices() -> vkGetPhysicalDeviceQueueFamilyProperties() 根据合适的队列簇，选择物理设备, 为了要在窗口中显示图片，队列就要支持绘制和呈现，也就是：VK_QUEUE_GRAPHICS_BIT  和 vkGetPhysicalDeviceSurfaceSupportKHR
+5) vkCreateDevice(): VkDeviceCreateInfo + VkDeviceQueueCreateInfo  创建逻辑设备、队列随着逻辑设备的创建而自动创建。
+
+6) vkCreateSwapchainKHR()
+7) vkCreateImageView(): 为了使用 VkImage,不管是在 SwapChain 还是在 Pipeline 中，都必须先创建 VkImageView, 它是 image 的一个 view，描述了我们如何访问 image、访问 image 的哪一部分等。
+8) : vkCreateShaderModule() 在 Vulkan 中，图形管线几乎完全不允许进行动态设置，如果我们 想使用其它着色器，绑定其它帧缓冲，以及改变混合函数，都需要重新创 建管线。这就迫使我们必须提前创建所有我们需要使用的图形管线，虽然 这样看起来不太方便，但这给驱动程序带来了很大的优化空间。
+
+
 #+ATTR_latex: :width 800
 #+ATTR_HTML: :width 800
 #+ATTR_ORG: :width 800
-[[file:vulkan_program_flow.jpg]]
+[[file:vulkan_pipeline.png]]
+
+
+vkCreateInstance() → vkEnumeratePhysicalDevices() → vkCreateDevice()
+vkEnumerateInstanceExtensionProperties()  // 为了在创建 instance 前检索支持的扩展 VkExtensionProperties
+
+vkEnumerateInstanceLayerProperties 函数列出所有可以用的层
+vkGetPhysicalDeviceFeatures
+vkGetPhysicalDeviceProperties
+vkGetPhysicalDeviceMemoryProperties
 
 
 * 111111
