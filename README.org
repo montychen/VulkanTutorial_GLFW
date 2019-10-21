@@ -84,18 +84,15 @@ make   #编译
 
 
 * Vulkan的大体流程：
-#+ATTR_latex: :width 800
-#+ATTR_HTML: :width 800
-#+ATTR_ORG: :width 800
+#+ATTR_latex: :width 800   #+ATTR_HTML: :width 800   #+ATTR_ORG: :width 800
 [[file:vulkan_program_flow.jpg]]
-
-
 
 
 
 * 初始化过程涉及的对象
 
-** 创建实例前，先确认所有想要的实例层扩展和验证是否都存在:
+** 选择设备：实例Instance -> 物理设备PhysicalDevice -> 逻辑设备Device
+*** 创建实例前，先确认所有想要的实例层扩展和验证是否都存在:
 - 3个实例层扩展 VK_KHR_surface, VK_MVK_macos_surface,  VK_EXT_debug_utils
 - 1个实例层验证 VK_LAYER_KHRONOS_validation
 
@@ -115,7 +112,7 @@ vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data
 glfwGetRequiredInstanceExtensions(&glfwExtensionCount); // 如果在macOS、Win系统上，这个方法可以方便的返回实例层用来创建surface所需要的扩展列表，不但有基础的VK_KHR_surface扩展， 还有针对特定操作系统的扩展，macOS是 VK_MVK_macos_surface
 vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data()); //  在创建实例前，获得所有可用于实例层的验证, 确认所有想要的验证都是存在的， 然后再在VkInstanceCreateInfo中请求启用。
 #+end_src
-** 创建一个 VkInstance 对象
+*** 创建一个 VkInstance 对象
 - 在instance_createInfo中启用3个实例层扩展、1个实例层验证；
 - 把pNext设为debugmsg_CreateInfo， 让2个自定义函数vkCreateDebugUtilsMessengerEXT 和 vkDestroyDebugUtilsMessengerEXT 可以共用一个VkDebugUtilsMessengerEXT实例
 
@@ -132,7 +129,7 @@ instance_createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugmsg_Crea
 vkCreateInstance(&createInfo, nullptr, &instance) // 创建实例，实例层扩展和验证，要在VkInstanceCreateInfo实例创建信息中请求启用。
 #+end_src
 
-** 创建VkDebugUtilsMessengerEXT实例
+*** 创建VkDebugUtilsMessengerEXT实例
 - 创建函数vkCreateDebugUtilsMessengerEXT 和 vkDestroyDebugUtilsMessengerEXT 共用的VkDebugUtilsMessengerEXT实例
 #+begin_src c++
 VkDebugUtilsMessengerEXT debugMessenger;
@@ -146,14 +143,14 @@ debugmsg_CreateInfo.pfnUserCallback = debugCallback; //  设置接收消息的�
 vkCreateDebugUtilsMessengerEXT(instance, &debugmsg_CreateInfo, nullptr, &debugMessenger); // 生成VkDebugUtilsMessengerEXT的实例。
 #+end_src
 
-** 创建窗口surface, 需要在instance被创建后立即被创建，因为这个surface会作为下面选择物理设备是否合适的一个条件
+*** 创建窗口surface, 需要在instance被创建后立即被创建，因为这个surface会作为下面选择物理设备是否合适的一个条件
 - 窗口 *VkSurfaceKHR* ： 后缀 KHR 意思是这些对象是 Vulkan 扩展的一部分。除非你不想显示图形(比如你只想离屏渲染)，不然你还是需要创建一个窗口来显示的。Vulkan API 是完全的平台不可知论者，这就是我们需要用标准化 WSI（窗口系统接口）扩展与窗口管理器交互的原因。Surface 是对可渲染窗口的跨平台抽象，一般通过提供一个本地窗口句柄的方式来实例化，例如在 Windows 上提供的句柄是 HWND。
 #+begin_src c++
 // vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &presentSupport); 判断某个gpu、的某个队列家族、是否支持在这个surface显示present图像。
 glfwCreateWindowSurface(instance, window, nullptr, &surface); // 创建surface
 #+end_src
 
-** 选择物理设备（VkPhysicalDevice）：队列支持绘制和显示 + 逻辑设备支持交换链扩展VK_KHR_swapchain
+*** 选择物理设备（VkPhysicalDevice）：队列支持绘制和显示 + 逻辑设备支持交换链扩展VK_KHR_swapchain
 - 枚举GPU硬件，选取一个或多个物理设备。一个VkInstance可有多个VkPhysicalDevice， 一个VkPhysicalDevice可创建多个逻辑设备VkDevice。跨GPU的调用还未实现。
 - 队列簇QueueFamily，如：RTX2080TI显卡有16个队列用于绘图、8个队列用于计算、1个队列用于CPU和GPU间的数据传输。Vulkan将这些专有的功能队列称之为簇， 每一簇里面又分别有不同数量的队列。
 - queue的职责是收集命令（命令缓冲区）并将其分派给gpu执行。 队列从QueueFamily中分配，Vulkan中的操作最终提交到Queue来异步执行的。共有4种队列
@@ -191,8 +188,7 @@ vkEnumeratePhysicalDevices(instance, &deviceCount, gpus.data()); // 枚举GPU
 
 #+end_src
 
-
-** 创建逻辑设备 VkDevice
+*** 创建逻辑设备 VkDevice
 - 为什么需要创建逻辑设备? 因为大多数时候我们不需要物理设备的全部功能，在不同的场景， 只会开启其中的部分功能。比如挖矿、视频解压等情况就不需要渲染簇； 要画面显示的应用就不需要Compute簇等等。
 
 #+begin_src c++
@@ -210,12 +206,13 @@ vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue
 #+end_src
 
 
-** 获取surface信息和创建Swapchain
+** 显示： 窗口surface -> 交换链Swapchain -> 图像视图ImageView
+*** 获取surface信息和创建Swapchain
 - 交换链 *VkSwapchainKHR* ：Vulkan 中没有 *默认帧缓冲区 default framebuffer* 的概念。交换链确保当窗口系统在显示一个图像时，应用程序可以准备下一个图像， 保证 image 完全渲染完毕后才能进行显示十分重要。每次我们想绘制一帧时， 我们请求交换链提供给我们一个用于渲染的 image，当这一帧完成绘制后，这个 image 返回到交换链，准备在某个时刻被屏幕消费，呈现到屏幕上。
   
 - vertical blank Interval vblank 垂直同步/垂直空白间隙： 我们通常收看的电视图象是由电子枪发射的电子串高速轰击显象管上的荧光物质而产生的，电子串按 从左至右， 从上至下的方式扫 描整个屏幕， 速度十分快，所以我们 的眼睛 感觉不到，当电子枪的扫描位置从左上角达到右下角时，必须由右下角回到下一 帧的左上角，以进行下一 张画面的显示。 而电子束的移动是需要时间的, 从右下角回到左上角所花费的时间就是垂直空白间隙。
   - vblank 垂直同步: 现在的显示器一般都支持双缓冲，一个由GPU写入，一个由显示器读取，到了时间再对换。详细的过程是： 当显示器绘制完A-buffer中的像素后（即绘制完第n+1帧），就会去读取B-buffer（GPU已经完成 写入的 第n+2帧）， 而GPU则转到这个被显示器已经读完的A-buffer，向其中写入第n+3帧的像素信息。有一种情况可能发生，在不严格规定时间间隙的情况下，GPU和显示器可能同时操作同一个buffer，就会导致 *画面的撕裂screen tearing* 。 显示器绘制 第n+1帧 到一半，buffer里 突然出现了第n+2帧的信息，造成显示器上的内容一半是第n+1帧，另一半是第n+2帧的，如果约定在vertical blank期间对 换buffer， 那么就能避免这个问题。 这个约定 就称为“垂直同步”。 因此，垂直同步不会增加GPU的负载， 但是会减少单位时间内画面的帧数， 因为即使 GPU渲染完了一帧， 必须要等待vertical blank， 才能将像素信息写入另一个buffer。
-    - 垂直同步的副作用 *「卡顿」 「画面延迟」* ：目前还有很多显示器刷新率是 60Hz，也就是每秒钟要显示 60 张画面，如果显卡每秒产生 120 张画面， 而显示器每秒只读取 60 张，这会出现什么问题呢？ 显示器提取画面的时候会从上 到下一行一行（逐行扫描）把画面显示出来，本来要 1/60 秒才能显示完， 然而显示了一半（1/120 秒）下一张画面就塞进来了。这时候显示器并不会停止工作，而是囫囵吞枣地把上一张画面的一半与下一张画面都显示出来。 由于 两张画面不一样，结果就是上面半截是第一张画面，下面半截是第二张画面，也就是所谓的 *画面撕裂* 。然而打开垂直同步又会引发一个问题。 如果跑步健将 博尔牛寺第 0 秒在起跑线上，第1/60秒就跑到了终点，那每秒渲染 60 张画面就完全看不到他中间的跑步过程！一开始就直接跑完。这就是所谓的 *「卡顿」* ，画面并不连贯。 于是你会发现 不少游戏 下面还有一个「双重缓冲」的开关，也就是多开设一个缓冲区。显卡依旧每秒渲染 120 张画面， 第一张存在 缓冲区1， 第二张存在缓冲区2。 显示器来读取画 面的时候按顺序先从缓冲区 1 那里读完，再从缓冲区 2 那里读。这样就不会撕裂也不会卡顿了啊~然而 这又出现一个 问题本来博尔牛寺 1/60 秒就把比赛跑完了， 显卡也把中间过程给渲染出来了，双重缓冲打开了之后，显示器从缓冲区 1 中读取第 0 秒的画面， 再从缓冲区 2 中读取第 1/120 秒的画面，再又回到缓冲区 1 中读取第 1/60 秒一共三张画面。显示器每 1/60 秒读取一张， 所以一共用时 3/60 秒。结果 就是博尔牛寺 活生生花了 3/60 秒才跑完，这就是所谓的 *「画面延迟」* 。
+    - 垂直同步的副作用 *「卡顿」 「画面延迟」* ：目前还有很多显示器刷新率是 60Hz，也就是每秒钟要显示 60 张画面，如果显卡每秒产生 120 张画面， 而显示器每秒只读取 60 张，这会出现什么问题呢？ 显示器提取画面的时候会从上 到下一行一 行（逐行扫描）把画面显示出来，本来要 1/60 秒才能显示完， 然而显示了一半（1/120 秒）下一张画面就塞进来了。这时候显示器并不会停止工作，而是囫囵吞枣地把上一张画面的一半与下一张画面都显示出来。 由于 两张画面不一样，结果 就是上面 半截是第一张画面，下面半截是第二张画面，也就是所谓的 *画面撕裂* 。然而打开垂直同步又会引发一个问题。 如果跑步健将 博尔牛寺第 0 秒在起跑线上，第1/60秒就跑到了终点，那每秒渲染 60 张画面就完全看不到他中间的跑步过程！ 一开始就 直接跑完。这就是所谓的 *「卡顿」* ，画面并不连贯。 于是你会发现 不少游戏 下面还有一个「双重缓冲」的开关，也就是多开设一个缓冲区。显卡依旧每秒渲染 120 张画面， 第一张存在 缓冲区1， 第二张存在缓冲区2。 显示器来读取画 面的时候按 顺序先从缓冲区 1 那里读完，再从缓冲区 2 那里读。这样就不会撕裂也不会卡顿了啊~然而 这又出现一个 问题本来博尔牛寺 1/60 秒就把比赛跑完了， 显卡也把中间过程给渲染出来了，双重缓冲打开了之后，显示器从缓冲区 1 中读取第 0 秒的画面， 再从缓冲区 2 中读取第 1/120 秒的画面，再又回到缓冲区 1 中读取第 1/60 秒一共三张画面。显示器每 1/60 秒读取一张， 所以一共用时 3/60 秒。结果 就是博尔牛寺 活生生花了 3/60 秒才跑完，这就是所谓的 *「画面延迟」* 。
 
   - vblank间隙信息传送: 在垂直空白间隙中，显示器不会显示影像，影像讯号也不会被显示器给删除步。这一段时间对于设备来说是一个浪费，因此人们想了办法来利用 这一段时间， 电视台可以利用这一时间发送一些不可显示信息， 如果您使用 过图文电视您就会立刻明白，为什么图文电视卡要接收电视信号，电视卡可以解读这 一信息，而电视不能，这种信息就是利用垂直回扫期发送的，电视卡通过RS-232端口将接收到的不可显示 信息传送给计算机，由计算机加以处理， 这就是图文电 视的原理，也就是说，电视台利用垂直回扫期发送一些不可显示的信息，而图文电视卡将这种信息接收下来，经过解码发送到计算机内由计算机处理。
 
@@ -268,7 +265,7 @@ vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue
      vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data()); //  交换链在创建的过程中，也会自动创建至少minImageCount个VkImage。从交换链中获取已经创建的VkImage
 #+end_src
 
-** VkImageView
+*** VkImageView
 - ImageView描述了如何访问Image以及访问图像的哪一部分，要在渲染管道中使用任何VkImage（包括交换链中的VkImage），必须创建一个VkImageView对象。
 - mipmap: 在三维世界中,显示一张图的大小与摄象机机距离模型的远近位置有关,近的地方,图片实际象素就大一些,远的地方图片实际象素就会小一些。 当摄像机较远的时候，用精细的贴图玩家也看不见，而且还浪费资源，此时完全可以进行一些压缩用更小的贴图。 mipmap纹理技术是目前解决纹理分辨率与视点距离关系的最有效途径,它会先将贴图压缩成很多逐渐缩小的图片, 按照2的倍数进行缩小直到1X1，把缩小的图都存储起来。例如一张64*64的图片,会产生64*64,32*32,16*16,8*8,4*4,2*2,1*1的7张图片,当屏幕上 需要绘制像素点 为20*20 时，程序只是利用 32*32 和 16*16 这两张图片来计算出即将显示为 20*20 大小的一个图片，这比单独利用 32*32 的那张原始片计算出来的图片效果要好得多，速度也更快.
   - mip level： 一系列缩略图的编号即为mip level。level 0 为原图，之后的每一个level 都比上一个level长宽缩减到一半，也就是按照2的倍数进行缩小直到1X1。Mip层0是最初的图像，之后的mip层被称为mip链。
@@ -293,9 +290,19 @@ vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue
     }
 }
     #+end_src
+
+    
 ** VkFrameBuffer
 - Framebuffer 其实就是一堆VkImageView，framebuffer引用imageView ，把它当做color、depth和stencil的目标使用。因为swapchain里可以有多个image。framebuffer的创建个数需要跟swapchain里image的数量对应.
- 
+
+
+** 图像管线Graphics pipeline ->
+#+ATTR_latex: :width 800   #+ATTR_HTML: :width 800  #+ATTR_ORG: :width 800
+[[file:vulkan_pipeline.png]]
+
+- Vulkan的图形管线则基本是完全不能改变的，所以如果你想要修改着色器，绑定不同帧缓冲或者改变混合函数，就要从头创建一个新的管线。缺点是你必须创建很多管线，代表所有你想要的不同的组合状态。但是由于你的操作都是预先知道的，驱动能很好地进行优化。
+- SPIR-V: Vulkan着色器代码Shader用字节码格式SPIR-V表示，而不是人类可读的语法如GLSL和HLSL。SPIR-V可以用于Vulkan和OpenCL，用来编写图形和计算着色器。我们不需要自己动手写字节码，LunarG SDK包含将GLSL编译到SPIR-V的程序 glslangValidator
+  
 ** 创建渲染通道 Render pass，它标明渲染目标和用法
 - render layer 是把不同的物体放到不同的 layer 层里去渲染，比如前景放到一层，背景放到一层，所以每个层里渲染出来的图像包括的物体的所有信息。比如物体的高光，颜色，反光，阴影等等都在一个层里。
 - render passes.是指把一个物体的所有信息，分开来进行渲染，比如颜色 pass、高光 passes、环境光遮挡等等其他 passes。为什么我们要用不同的 pass 来渲染呢？在源头就将这些信息独立开来，这样在合成的时候我们就可以有更多的控制空间和选择余地了。
@@ -307,6 +314,9 @@ vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue
 color attachment 为从 swap chain 获取的 image，depth/stencil attachment 为 depth buffer 的 image。
 
 ** 构建图形管线 Graphics pipeline
+#+ATTR_latex: :width 800   #+ATTR_HTML: :width 800  #+ATTR_ORG: :width 800
+[[file:vulkan_pipeline.png]]
+
 - Graphics Pipeline 通过创建 VkPipeline 对象来建立。它描述了一些显卡 *不可编程部分* 的可配置状态(configurable state )，比如 viewport 的大小和 depth buffer 操作等，以及用 *VkShaderModule 表示的可编程部分* 。VkShaderModule 对象用着色器的字节码来创建。驱动需要知道哪些渲染目标将在 pipeline 中使用，而这些目标就是我们在 Render pass 中定义的 image。
 
 - Vulkan 和现存的其他图形 API 最显著地区别就是：几乎所有不可编程部分的配置都要在 pipeline 创建前提前完成。这就意味着如果你想换一个着色器(shader)或者仅仅改变一些顶点的布局(vertex layout) ,那么你必须重新创建 pipeline 。这也意味着你必须提前创建很多 pipeline，来应对渲染过程中不同组合的配置。只有很少的一些配置你可以动态改变，比如 viewport 的大小和 celar 的颜色等。Pipeline 中所有的配置状态你必须显示的进行定义，比如，颜色混合就没有为你提供默认的配置。
@@ -377,7 +387,7 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
     vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 }
 
-{ // createSwapChain
+{ // createSwapChain 
     {// querySwapChainSupport(physicalDevice);  获取surface的 capabilities、formats、presentModes
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &details.capabilities); // 基础surface功能（交换链包含的image的最大\小数量，image的宽度和高度的最大\最小值）
         vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &formatCount, details.formats.data()); // Surface格式（像素用32位表示VK_FORMAT_B8G8R8A8_UNORM、使用SRGB颜色空间 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR

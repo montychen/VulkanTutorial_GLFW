@@ -120,6 +120,7 @@ class HelloTriangleApplication {
             createLogicalDevice();
             createSwapChain();
             createImageViews();
+            createGraphicsPipeline();
         }
 
         void mainLoop() {
@@ -348,7 +349,7 @@ class HelloTriangleApplication {
             swapChainExtent = extent;
         }
 
-        void createImageViews() {
+        void createImageViews() { // ImageView描述了如何访问Image以及访问图像的哪一部分，要在渲染管道中使用任何VkImage（包括交换链中的VkImage），必须创建一个VkImageView对象。
             swapChainImageViews.resize(swapChainImages.size());
 
             for (size_t i = 0; i < swapChainImages.size(); i++) { //  为交换链中每个图像创建一个ImageView
@@ -371,6 +372,10 @@ class HelloTriangleApplication {
                     throw std::runtime_error("failed to create image views!");
                 }
             }
+        }
+
+        void createGraphicsPipeline() {
+
         }
 
         VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
