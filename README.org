@@ -360,7 +360,7 @@ vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue
   - 远截面far Z Plane，简称far面， 用于将离相机太远的物体裁剪掉。
 
 
-- 视锥剔除Frustum Culling非常的快(如果算法好的话)，而且是在渲染管线(Rendering Pipeline)之前进行的，不像背面剔除Backface Culling那样需要在渲染管线之后一个顶点一个顶点地计算。对于被剪裁掉的物体绘图引擎都不会将其送入显卡，因此视锥剔除对渲染速度有巨大的改善,毕竟什么都不渲染是最快的渲染. 
+- 视锥剔除Frustum Culling非常的快(如果算法好的话)，而且是在渲染管线(Rendering Pipeline)之前进行的，不像背面剔除Backface Culling那样需要在渲染管线之后一个顶点一个顶点地计算。对于被剪裁掉的物体绘图引擎都不会将其送入显卡，因此视锥剔除对渲染速度有巨大的改善,毕竟什么都不渲染是最快的渲染.
 
 ** 创建渲染通道 Render pass，它标明渲染目标和用法
 - render layer 是把不同的物体放到不同的 layer 层里去渲染，比如前景放到一层，背景放到一层，所以每个层里渲染出来的图像包括的物体的所有信息。比如物体的高光，颜色，反光，阴影等等都在一个层里。
