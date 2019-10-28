@@ -375,8 +375,45 @@ class HelloTriangleApplication {
         }
 
         void createGraphicsPipeline() {
+            auto vertShaderCode = readFile("shaders/vert.spv");
+            auto fragShaderCode = readFile("shaders/frag.spv");
 
+            VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+            VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+            VkPipelineShaderStageCreateInfo vertShaderStageInfo = {}; // 将着色器模块分配给管道中的顶点或片段着色器阶段是通过VkPipelineShaderStageCreateInfo结构进行的
+            vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT; // 告诉Vulkan将在哪个管道阶段使用着色器
+            vertShaderStageInfo.module = vertShaderModule;
+            vertShaderStageInfo.pName = "main"; // 指定包含代码的着色器模块和要调用的函数。这意味着可以将多个顶点着色器组合到一个着色器模块中，并使用不同的入口点来区分它们的行为
+
+            VkPipelineShaderStageCreateInfo fragShaderStageInfo = {}; // 将着色器模块分配给管道中的顶点或片段着色器阶段是通过VkPipelineShaderStageCreateInfo结构进行的
+            fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT; // 告诉Vulkan将在哪个管道阶段使用着色器
+            fragShaderStageInfo.module = fragShaderModule;
+            fragShaderStageInfo.pName = "main"; // 指定包含代码的着色器模块和要调用的函数。意味着可以将多个片段着色器组合到一个着色器模块中，并使用不同的入口点来区分它们的行为
+
+            VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+            vkDestroyShaderModule(device, fragShaderModule, nullptr);
+            vkDestroyShaderModule(device, vertShaderModule, nullptr);
         }
+
+        // 创建着色器模块：着色器代码要先封装在着色器模块中VkShaderModule， 才能传给图形管线
+        VkShaderModule createShaderModule(const std::vector<char>& code) {
+            VkShaderModuleCreateInfo createInfo = {};
+            createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;    // 创建着色器模块很简单，只需要一个指向字节码缓冲区的指针， 和字节码长度
+            createInfo.codeSize = code.size();                                 // 字节码的大小是以字节为单位指定的
+            createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data()); // 但字节码指针是uint32_t*类型而不是char指针。因此用reinterpret_cast进行转换
+
+            VkShaderModule shaderModule;
+            if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+                throw std::runtime_error("failed to create shader module!");
+            }
+
+            return shaderModule;
+        }
+
 
         VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
             for (const auto& availableFormat : availableFormats) { // VK_FORMAT_B8G8R8A8_UNORM表示以B，G，R和A的顺序，每个颜色通道用8位无符号整型数表示，总共每像素使用32位表示
@@ -564,6 +601,25 @@ class HelloTriangleApplication {
             }
 
             return true;
+        }
+
+        // 辅助函数来从文件中加载二进制数据：字节码的着色器
+        static std::vector<char> readFile(const std::string& filename) {
+            std::ifstream file(filename, std::ios::ate | std::ios::binary); // ate从文件末尾开始阅读；binary将文件读取为二进制文件（避免文本转换）
+
+            if (!file.is_open()) {
+                throw std::runtime_error("failed to open file!");
+            }
+
+            size_t fileSize = (size_t) file.tellg(); // 从文件末尾开始读取的优点是我们可以利用读取位置来确定文件的大小并分配缓冲区
+            std::vector<char> buffer(fileSize);
+
+            file.seekg(0);      // 回到文件的开头重新读取所有字节
+            file.read(buffer.data(), fileSize);
+
+            file.close();
+
+            return buffer;
         }
 
 
