@@ -308,7 +308,12 @@ vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue
 [[file:vulkan_pipeline.png]]
 
 - Vulkan的图形管线则基本是完全不能改变的，所以如果你想修改着色器，绑定不同帧缓冲或者改变混合函数，就要从头创建一个新的管线。缺点是你必须创建很多管线，代表所有你想要的不同的组合状态。但是由于你的操作都是预先知道的，驱动能很好地进行优化。
-- SPIR-V是Vulkan着色器代码Shader的格式， 它是字节码格式，不是GLSL和HLSL这些人类可读的语法。SPIR-V可用于Vulkan和OpenCL，用来编写图形和计算着色器。我们不需要自己写字节码，LunarG SDK包含将GLSL编译到SPIR-V的程序glslangValidator
+- SPIR-V是Vulkan着色器代码Shader的格式， 它是字节码格式，不是GLSL和HLSL这些人类可读的语法。SPIR-V可用于Vulkan和OpenCL，用来编写图形和计算着色器。我们不需要自己写字节码，LunarG SDK包含将GLSL编译到SPIR-V的程序glslc或者glslangValidator
+  - 把顶点着色器、片段着色器编译成SPIR-V字节码
+    #+begin_src bash
+$VULKAN_SDK/bin/glslc shader.vert -o vert.spv # 编译顶点着色器
+$VULKAN_SDK/bin/glslc shaser.frag -o frag.spv # 编译片段着色器
+    #+end_src
 
   
 ** Vulkan坐标和投影
