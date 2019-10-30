@@ -316,6 +316,8 @@ $VULKAN_SDK/bin/glslc shaser.frag -o frag.spv # 编译片段着色器
     #+end_src
 - 创建着色器模块：着色器代码要先封装在着色器模块中VkShaderModule， 才能传给图形管线
 
+- Primitive restart 图元重启： 绘制图形时，可能需要绘制多个并不相连、离散的图形，这种情况下这几个图形没法被当做一个图形来处理, 传统的做法需要调用多次绘制函数。而每次调用绘制函数的资源开销是比较大的，如果每一帧里绘制函数调用太多次，会对程序性能产生较大影响。 提高性能的办法是，减少绘制函数调用（只调用一次绘制函数），画出分散的图形，这就是图元重启。 比如当绘制函数按照indices所指定的顶点的顺序绘制时， 可以指定某一个值，该值表示一个重启的标志。遇到这个值的时候， Vulkan不会绘制图元， 而是 结束上一段绘制，然后重新启 动新的绘制， 也就是說用后面的索引所指定的顶点来从头绘制一个图形。
+
 *** Vulkan坐标和投影
 **** Vulkna坐标
 - NDC(Normalized Device Coordinates) 设备空间或标准化设备坐标：无论引擎中的坐标系是如何，有没有使用到世界空间、相机空间、投影空间等等，最终我们都需要统一到NDC这个坐标系下，这个坐标系也可以理解为应用程序与GPU的接口。
@@ -518,13 +520,6 @@ glfwCreateWindowSurface(instance, window, nullptr, &surface);
 6) vkCreateSwapchainKHR()
 7) vkCreateImageView(): 为了使用 VkImage,不管是在 SwapChain 还是在 Pipeline 中，都必须先创建 VkImageView, 它是 image 的一个 view，描述了我们如何访问 image、访问 image 的哪一部分等。
 8) : vkCreateShaderModule() 在 Vulkan 中，图形管线几乎完全不允许进行动态设置，如果我们 想使用其它着色器，绑定其它帧缓冲，以及改变混合函数，都需要重新创 建管线。这就迫使我们必须提前创建所有我们需要使用的图形管线，虽然 这样看起来不太方便，但这给驱动程序带来了很大的优化空间。
-
-
-#+ATTR_latex: :width 800
-#+ATTR_HTML: :width 800
-#+ATTR_ORG: :width 800
-[[file:vulkan_pipeline.png]]
-
 
 vkCreateInstance() → vkEnumeratePhysicalDevices() → vkCreateDevice()
 vkEnumerateInstanceExtensionProperties()  // 为了在创建 instance 前检索支持的扩展 VkExtensionProperties
