@@ -14,8 +14,7 @@
 const int WIDTH = 800;
 const int HEIGHT = 600;
 
-// 以前Vulkan中有两种类型的验证层：针对instance的和针对device的。Instance层只检查与全局Vulkan对象（如instance）的调用；
-// device层只检查与特定GPU的调用。Device层现在已经被废弃了。
+// 以前Vulkan中有两种类型的验证层：针对instance的和针对device的。Instance层只检查与全局Vulkan对象（如instance）的调用； device层只检查与特定GPU的调用。Device层现在已经被废弃了。
 const std::vector<const char*> validationLayers = {
 "VK_LAYER_KHRONOS_validation"  // VK_LAYER_KHRONOS_validation是一个大的验证层集合，系统把所有标准常用的验证层，都融合在一起。
 };
@@ -34,8 +33,7 @@ const bool enableValidationLayers = true;
 #endif
 
 
-// 函数vkCreateDebugUtilsMessengerEXT 用来生成具体的VkDebugUtilsMessengerEXT消息对象。不幸的是，因为这个函数是个扩展函数，
-// 它不会自动加载。我们不得不用vkGetInstanceProcAddr函数来查找它的地址。
+// 函数vkCreateDebugUtilsMessengerEXT 用来生成具体的VkDebugUtilsMessengerEXT消息对象。不幸的是，因为这个函数是个扩展函数，它不会自动加载。我们不得不用vkGetInstanceProcAddr函数来查找它的地址。
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
     auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");   // 获取函数地址
     if (func != nullptr) {
@@ -408,51 +406,51 @@ class HelloTriangleApplication {
             inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;  // TRIANGLE_LIST：三个点成为一个三角形，顶点不重复使用; TRIANGLE_STRIP：每个三角形的第二个和第三个顶点用作下一个三角形的前两个顶点
             inputAssembly.primitiveRestartEnable = VK_FALSE;               // 不开启图元重启primitive restart
 
-            VkViewport viewport = {};
+            VkViewport viewport = {}; // 视口
             viewport.x = 0.0f;
             viewport.y = 0.0f;
             viewport.width = (float) swapChainExtent.width;
             viewport.height = (float) swapChainExtent.height;
-            viewport.minDepth = 0.0f;
-            viewport.maxDepth = 1.0f;
+            viewport.minDepth = 0.0f; // 指定用于帧缓冲区的深度值的范围，这里指定允许的最小值，0.0
+            viewport.maxDepth = 1.0f; // 指定用于帧缓冲区的深度值的范围，这里指定允许的最大值，1.0
 
-            VkRect2D scissor = {};
+            VkRect2D scissor = {}; // 裁剪矩形
             scissor.offset = {0, 0};
             scissor.extent = swapChainExtent;
 
-            VkPipelineViewportStateCreateInfo viewportState = {};
+            VkPipelineViewportStateCreateInfo viewportState = {}; // 将视口和裁剪矩形组合到一起
             viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
             viewportState.viewportCount = 1;
             viewportState.pViewports = &viewport;
             viewportState.scissorCount = 1;
             viewportState.pScissors = &scissor;
 
-            VkPipelineRasterizationStateCreateInfo rasterizer = {};
+            VkPipelineRasterizationStateCreateInfo rasterizer = {}; // 光栅化使用在顶点着色器由顶点组成的几何体，将其转换为片段。还可以执行深度测试，面部剔除和裁剪测试，并且为输出选择是填充整个多边形还是仅仅填充边缘（线框渲染）
             rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-            rasterizer.depthClampEnable = VK_FALSE;
-            rasterizer.rasterizerDiscardEnable = VK_FALSE;
-            rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-            rasterizer.lineWidth = 1.0f;
-            rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-            rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-            rasterizer.depthBiasEnable = VK_FALSE;
+            rasterizer.depthClampEnable = VK_FALSE; // 如果depthClampEnable设为VK_TRUE，那么超出近平面和远平面的片段将会收敛它们来使用而不是丢弃。这在阴影贴图等特殊情况下很有用
+            rasterizer.rasterizerDiscardEnable = VK_FALSE; // 如果rasterizerDiscardEnable设为VK_TRUE，则几何体永远不会通过光栅化器阶段。这基本上禁用了帧缓冲的所有输出。
+            rasterizer.polygonMode = VK_POLYGON_MODE_FILL; // 声明如何绘制多边形。FILL填充、LINE绘制边缘、POINT多边形顶点绘制为点
+            rasterizer.lineWidth = 1.0f;                   // 线段宽度。任何大于1.0f的线都要启用GPU的wideLines功能。
+            rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;   // 面部剔除的类型：可以选择禁用剔除，剔除正面，剔除背面或都剔除
+            rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE; // 面向前面的面的顶点顺序，可以是顺时针或逆时针。
+            rasterizer.depthBiasEnable = VK_FALSE;          // 光栅化可以通过添加常量值或根据片段的斜率更改偏置来更改深度值。这个方法有时用于阴影贴图，但我们在这里不使用
 
-            VkPipelineMultisampleStateCreateInfo multisampling = {};
+            VkPipelineMultisampleStateCreateInfo multisampling = {}; // 多重采样，这是消除锯齿的方法之一。将光栅化后位于同一像素的点经过片段着色器进行处理后得到的结果来进行组合。这主要发生在边缘，也是最明显的锯齿出现的地方。
             multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-            multisampling.sampleShadingEnable = VK_FALSE;
-            multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+            multisampling.sampleShadingEnable = VK_FALSE;               // 根据每个样本或每个片段为基准执行片段着色。值为 VK_TRUE，则是每个样本，否则为每个片段。
+            multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT; // 该字段表示光栅化过程中每个像素使用的样本数。VK_SAMPLE_COUNT_1_BIT表示不在光栅化阶段做多重采样
 
-            VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+            VkPipelineColorBlendAttachmentState colorBlendAttachment = {}; // 配置每个帧缓冲的颜色混合参数（src, dst, op）。颜色混合：片段着色器返回颜色后，需要将其与帧缓冲区中已有的颜色组合
             colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-            colorBlendAttachment.blendEnable = VK_FALSE;
+            colorBlendAttachment.blendEnable = VK_FALSE; // 指示是否希望启用混合。
 
-            VkPipelineColorBlendStateCreateInfo colorBlending = {};
+            VkPipelineColorBlendStateCreateInfo colorBlending = {}; // 配置全局（新创建的）渲染管线的颜色混合参数，并且传入上面的BlendAttachment。颜色混合：片段着色器返回颜色后，需要将其与帧缓冲区中已有的颜色组合
             colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-            colorBlending.logicOpEnable = VK_FALSE;
-            colorBlending.logicOp = VK_LOGIC_OP_COPY;
+            colorBlending.logicOpEnable = VK_FALSE;   // 指示是否希望启用有关像素的逻辑操作。
+            colorBlending.logicOp = VK_LOGIC_OP_COPY; // 预执行的逻辑操作类型（比如拷贝、清空等）
             colorBlending.attachmentCount = 1;
             colorBlending.pAttachments = &colorBlendAttachment;
-            colorBlending.blendConstants[0] = 0.0f;
+            colorBlending.blendConstants[0] = 0.0f; // blendConstants包含用于混合的4个值（R、G、B、A）。
             colorBlending.blendConstants[1] = 0.0f;
             colorBlending.blendConstants[2] = 0.0f;
             colorBlending.blendConstants[3] = 0.0f;
@@ -535,8 +533,8 @@ class HelloTriangleApplication {
         }
 
 
-        // extent 是Swap Chain中image的宽高分辨率(resolution) ,通常它与window的尺寸一样，vulkan让我们通过设置currentExtent设置width和height来匹配window的分辨率。
-        // 但有些window Manager会将currentExtent设置为uint32_t的最大值，来表示允许我们设置不同的值，这个时候我们可以从minImageExtent和maxImageExtent中选择最匹配window的尺寸值。
+        // extent 是Swap Chain中image的宽高分辨率(resolution) ,通常它与window的尺寸一样，可通过currentExtent设置width和height来匹配window的分辨率。
+        // 但有些window Manager将currentExtent设置为uint32_t的最大值，来表示允许我们设置不同的值，这时我们可以从minImageExtent和maxImageExtent中选择最匹配window的值。
         VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
             if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
                 return capabilities.currentExtent;
