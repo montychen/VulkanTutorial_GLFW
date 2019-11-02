@@ -455,7 +455,7 @@ class HelloTriangleApplication {
             colorBlending.blendConstants[2] = 0.0f;
             colorBlending.blendConstants[3] = 0.0f;
 
-            VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+            VkPipelineLayoutCreateInfo pipelineLayoutInfo = {}; // 即使用不到，仍然需要创建一个空的管道布局。
             pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             pipelineLayoutInfo.setLayoutCount = 0;
             pipelineLayoutInfo.pushConstantRangeCount = 0;
