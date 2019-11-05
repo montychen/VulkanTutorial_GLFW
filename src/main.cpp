@@ -132,6 +132,8 @@ class HelloTriangleApplication {
         }
 
         void cleanup() {
+            vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+
             for (auto imageView : swapChainImageViews) {
                 vkDestroyImageView(device, imageView, nullptr);
             }
@@ -455,11 +457,10 @@ class HelloTriangleApplication {
             colorBlending.blendConstants[2] = 0.0f;
             colorBlending.blendConstants[3] = 0.0f;
 
-            VkPipelineLayoutCreateInfo pipelineLayoutInfo = {}; // 即使用不到，仍然需要创建一个空的管道布局。
+            VkPipelineLayoutCreateInfo pipelineLayoutInfo = {}; // 即使用不到，仍然需要创建一个空的管道布局。管道布局并不关心着色器中定义的内容, 它只关心描述符和推送常量
             pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-            pipelineLayoutInfo.setLayoutCount = 0;
-            pipelineLayoutInfo.pushConstantRangeCount = 0;
-
+            pipelineLayoutInfo.setLayoutCount = 0;   // Push constant是流水线的一部分，所以在设置VkPipelineLayout阶段（包含 descriptor set layout 和 push constant）就要让流水线知道有push constant的存在
+            pipelineLayoutInfo.pushConstantRangeCount = 0; // 使用 VkPushConstantRange 声明设置 push constants 的用途和大小
             if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
                 throw std::runtime_error("failed to create pipeline layout!");
             }

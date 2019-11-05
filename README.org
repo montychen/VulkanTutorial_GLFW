@@ -86,11 +86,10 @@ make   #编译
   - 假设CPU是客户端，GPU是服务器的话，VkDescriptorSetLayout就好比通信的协议，比方说：
     CPU: 老哥，等会我会给你仍一坨0101的数据进显存，记得按这份layout协议解读噢，第一个是矩阵，第二个vec3,第三个是float。我会把数据对齐仍进去的。
     GPU: 好的小老弟。
-
   - 协议定好了，下面就要把数据放进一个封包里面了。封包就是VkDescriptorSet，它是buffer(GPU数据)和layout(协议)的桥梁， 另外封包需要用一个池子来生成，这个池子叫VkDescriptorPool。
 - 显存VkDeviceMemory通过vkBindBufferMemory，建立memory(显存)和buffer(GPU数据)的联系
-  桥梁定好了，后面开始把数据放进buffer就完事了。但是buffer的数据是在GPU端的，所以我们要用内存映射的方式，将我们的数据拷贝到对应的显存，这个显存就是VkDeviceMemory,它会通过vkBindBufferMemory，建立memory(显存)和buffer(GPU数据)的联系。
-  于是我们的数据就会通过这个uniform流程跑到shader里面： *data->memory->buffer->descriptorSet(数据桥)->descriptorLayout(协议桥)->shader*
+  - 桥梁定好了，后面开始把数据放进buffer就完事了。但是buffer的数据是在GPU端的，所以我们要用内存映射的方式，将我们的数据拷贝到对应的显存，这个显存就是VkDeviceMemory,它会通过vkBindBufferMemory，建立memory(显存)和buffer(GPU数据)的联系。
+  - 于是我们的数据就会通过这个uniform流程跑到shader里面： *data->memory->buffer->descriptorSet(数据桥)->descriptorLayout(协议桥)->shader*
 
 * 初始化过程涉及的对象
 
@@ -331,6 +330,10 @@ $VULKAN_SDK/bin/glslc shaser.frag -o frag.spv # 编译片段着色器
 - uniform & VkPipelineLayout: Uniform是一种从CPU中的应用向GPU中的着色器发送数据的方式，uniform变量需要在管线创建时使用VkPipelineLayout对象定义。
   - 在着色器中使用uniform变量，它可以在管线建立后动态地被应用程序修改，实现对着色器进行一 定程度的动态配置。 uniform变量经常被用来传递变换矩阵给顶点着色器，以及传递纹理采样器句柄给片段着色器。
   - uniform是全局的(Global)。全局意味着uniform变量必须在每个着色器程序对象中都是独一无二的。第二，无论你把uniform值设置成什么，uniform会一直保存它们的数据，直到它们被重置或更新。
+- Push Constant: 一些经常变化的小数据，比如说变换矩阵、光源位置等，可以通过流水线中的 push constants 直接传入 shader，其直接从 data path 传入，从而可以避免分配缓存等更重的操作，节省性能开销。
+  - 需要注意，一个 shader 只能分配一个 push constants 块，并且这个块的大小极度受限（maxPushConstantsSize），在笔者的机器上为 256 Bytes
+  - 由于 Push constants 是流水线的一部分，所以在设置VkPipelineLayout阶段（包含 descriptor set layout 和 push constants）就要让流水线知道有 push constants 的存在
+    - 使用 VkPushConstantRange 声明设置 push constants 的用途和大小
 
 *** Vulkan坐标和投影
 **** Vulkna坐标
