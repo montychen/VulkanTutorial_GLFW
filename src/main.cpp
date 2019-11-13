@@ -121,6 +121,7 @@ class HelloTriangleApplication {
             createLogicalDevice();
             createSwapChain();
             createImageViews();
+            createRenderPass();
             createGraphicsPipeline();
         }
 
@@ -377,6 +378,40 @@ class HelloTriangleApplication {
             }
         }
 
+        // 在完成pipeline管道创建之前，需要用render pass来告诉Vulkan，渲染时将要使用的帧缓冲附件framebuffer attachments: 包括需要多少个颜色和深度缓冲区，每个缓冲区使用多少个采样样本，以及在整个渲染操作中如何处理它们的内容。
+        void createRenderPass() {
+            VkAttachmentDescription colorAttachment = {};
+            colorAttachment.format = swapChainImageFormat;
+            colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+            colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+            VkAttachmentReference colorAttachmentRef = {};
+            colorAttachmentRef.attachment = 0;
+            colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+            VkSubpassDescription subpass = {};
+            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            subpass.colorAttachmentCount = 1;
+            subpass.pColorAttachments = &colorAttachmentRef;
+
+            VkRenderPassCreateInfo renderPassInfo = {};
+            renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+            renderPassInfo.attachmentCount = 1;
+            renderPassInfo.pAttachments = &colorAttachment;
+            renderPassInfo.subpassCount = 1;
+            renderPassInfo.pSubpasses = &subpass;
+
+            if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+                throw std::runtime_error("failed to create render pass!");
+            }
+        }
+
+
         void createGraphicsPipeline() {
             auto vertShaderCode = readFile("shaders/vert.spv");
             auto fragShaderCode = readFile("shaders/frag.spv");
@@ -386,19 +421,19 @@ class HelloTriangleApplication {
 
             VkPipelineShaderStageCreateInfo vertShaderStageInfo = {}; // 将着色器模块分配给管道中的顶点或片段着色器阶段是通过VkPipelineShaderStageCreateInfo结构进行的
             vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-            vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT; // 告诉Vulkan将在哪个管道阶段使用着色器
-            vertShaderStageInfo.module = vertShaderModule;
-            vertShaderStageInfo.pName = "main"; // 指定包含代码的着色器模块和要调用的函数。这意味着可以将多个顶点着色器组合到一个着色器模块中，并使用不同的入口点来区分它们的行为
+            vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT; // 顶点着色器。告诉Vulkan将在哪个管道阶段使用着色器
+            vertShaderStageInfo.module = vertShaderModule;          // 指定包含代码的着色器模块
+            vertShaderStageInfo.pName = "main"; // 指定着色器模块要调用的函数。这意味着可以将多个顶点着色器组合到一个着色器模块中，并使用不同的入口点来区分它们的行为
 
             VkPipelineShaderStageCreateInfo fragShaderStageInfo = {}; // 将着色器模块分配给管道中的顶点或片段着色器阶段是通过VkPipelineShaderStageCreateInfo结构进行的
             fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-            fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT; // 告诉Vulkan将在哪个管道阶段使用着色器
-            fragShaderStageInfo.module = fragShaderModule;
-            fragShaderStageInfo.pName = "main"; // 指定包含代码的着色器模块和要调用的函数。意味着可以将多个片段着色器组合到一个着色器模块中，并使用不同的入口点来区分它们的行为
+            fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT; // 片段着色器。告诉Vulkan将在哪个管道阶段使用着色器
+            fragShaderStageInfo.module = fragShaderModule;            // 指定包含代码的着色器模块
+            fragShaderStageInfo.pName = "main"; // 指定着色器模块要调用的函数。意味着可以将多个片段着色器组合到一个着色器模块中，并使用不同的入口点来区分它们的行为
 
             VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-            VkPipelineVertexInputStateCreateInfo vertexInputInfo = {}; // 描述传递给vertex shader的顶点数据格式, Vertex input state属于图形管线的input assembler阶段。
+            VkPipelineVertexInputStateCreateInfo vertexInputInfo = {}; // 描述传递给vertex shader的顶点数据格式
             vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
             vertexInputInfo.vertexBindingDescriptionCount = 0; // 在顶点着色器中直接对顶点数据硬编码，所以要指定没有要加载的顶点数据
             vertexInputInfo.vertexAttributeDescriptionCount = 0;

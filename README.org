@@ -332,8 +332,9 @@ $VULKAN_SDK/bin/glslc shaser.frag -o frag.spv # 编译片段着色器
   - uniform是全局的(Global)。全局意味着uniform变量必须在每个着色器程序对象中都是独一无二的。第二，无论你把uniform值设置成什么，uniform会一直保存它们的数据，直到它们被重置或更新。
 - Push Constant: 一些经常变化的小数据，比如说变换矩阵、光源位置等，可以通过流水线中的 push constants 直接传入 shader，其直接从 data path 传入，从而可以避免分配缓存等更重的操作，节省性能开销。
   - 需要注意，一个 shader 只能分配一个 push constants 块，并且这个块的大小极度受限（maxPushConstantsSize），在笔者的机器上为 256 Bytes
-  - 由于 Push constants 是流水线的一部分，所以在设置VkPipelineLayout阶段（包含 descriptor set layout 和 push constants）就要让流水线知道有 push constants 的存在
+  - 由于Push constant是流水线的一部分，所以在设置VkPipelineLayout阶段（包含 descriptor set layout 和 push constant）就要让流水线知道有push constant的存在
     - 使用 VkPushConstantRange 声明设置 push constants 的用途和大小
+
 
 *** Vulkan坐标和投影
 **** Vulkna坐标
@@ -389,7 +390,7 @@ $VULKAN_SDK/bin/glslc shaser.frag -o frag.spv # 编译片段着色器
 
 ** 创建渲染通道 Render pass，它标明渲染目标和用法
 - render layer 是把不同的物体放到不同的 layer 层里去渲染，比如前景放到一层，背景放到一层，所以每个层里渲染出来的图像包括的物体的所有信息。比如物体的高光，颜色，反光，阴影等等都在一个层里。
-- render passes.是指把一个物体的所有信息，分开来进行渲染，比如颜色 pass、高光 passes、环境光遮挡等等其他 passes。为什么我们要用不同的 pass 来渲染呢？在源头就将这些信息独立开来，这样在合成的时候我们就可以有更多的控制空间和选择余地了。
+- render pass: 把一个物体的所有信息，分开来进行渲染，比如颜色pass、高光passes、环境光遮挡等等其他passes。为什么我们要用不同的pass来渲染呢？在源头就将这些信息独立开来，这样在合成的时候我们就可以有更多的控制空间和选择余地了。
 
 - Render pass 描述了在渲染阶段要使用的 image 类型、如何使用以及如何处理 image 的内容。请注意，Render pass 只是描述要使用的 image 类型，而 framebuffer( 通过绑定 image )才是要使用的 image 实体。
 - VkRenderPass 由多个子 pass 组成。在简单的场景一般只有一个子 pass。子 pass 选择一些 attachment 作为颜色目标，另外一些作为深度和模版目标。如果你有多个子 pass，每个子 pass 将有不同的集合，一些用于输入，一些用于输出。
