@@ -134,6 +134,7 @@ class HelloTriangleApplication {
 
         void cleanup() {
             vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+            vkDestroyRenderPass(device, renderPass, nullptr);
 
             for (auto imageView : swapChainImageViews) {
                 vkDestroyImageView(device, imageView, nullptr);
@@ -380,24 +381,24 @@ class HelloTriangleApplication {
 
         // 在完成pipeline管道创建之前，需要用render pass来告诉Vulkan，渲染时将要使用的帧缓冲附件framebuffer attachments: 包括需要多少个颜色和深度缓冲区，每个缓冲区使用多少个采样样本，以及在整个渲染操作中如何处理它们的内容。
         void createRenderPass() {
-            VkAttachmentDescription colorAttachment = {};
-            colorAttachment.format = swapChainImageFormat;
-            colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-            colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-            colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            VkAttachmentDescription colorAttachment = {};  // 只有一个颜色缓冲附件，由交换链中的一个图像表示
+            colorAttachment.format = swapChainImageFormat; //  VK_FORMAT_B8G8R8A8_UNORM
+            colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT; // 使用1个样本。  loadOp和storeOp设置在渲染之前和渲染之后如何处理附件中的数据。loadOp和storeOp适用于颜色和深度数据
+            colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // 使用clear操作在绘制新帧之前将帧缓冲区清除为黑色。 VK_ATTACHMENT_LOAD_OP_CLEAR：在开始时以一个常量清理附件内容; LOAD_OP_LOAD：保留附件的现有内容; LOAD_OP_DONT_CARE：现有内容未定义，忽略它们
+            colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // 希望在屏幕上看到渲染后的三角形，所以这里使用store操作。VK_ATTACHMENT_STORE_OP_STORE：渲染内容将存储在内存中，方便之后读取； STORE_OP_DONT_CARE：渲染操作后，帧缓冲区的内容变为undefined
+            colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // stencilLoadOp/stencilStoreOp适用于模板数据。我们的应用程序不会对模板缓冲区执行任何操作，因此相应的加载和存储结果都无关紧要。
             colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;     // initialLayout指定了渲染通道开始之前图像将具有的布局, VK_IMAGE_LAYOUT_UNDEFINED意味着不关心图像之前的布局。因为都要清除它的。
+            colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // 希望在图像渲染完毕后使用交换链呈现，所以finalLayout设置为VK_IMAGE_LAYOUT_PRESENT_SRC_KHR：图像在交换链中呈现; COLOR_ATTACHMENT_OPTIMAL：图像用作颜色附件; TRANSFER_DST_OPTIMAL：图像作为目标，用于内存复制操作
 
             VkAttachmentReference colorAttachmentRef = {};
-            colorAttachmentRef.attachment = 0;
-            colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            colorAttachmentRef.attachment = 0; // 指定我们要使用的附件索引， 本例只有一个附件，所以是0
+            colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; //  在启动子通道时，Vulkan会自动将附件转换为此布局。我们打算将附件用作颜色缓冲区里VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 
             VkSubpassDescription subpass = {};
-            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS; // Vulkan可能在未来支持计算子通道，因此我们必须明确将其指定为图形子通道
             subpass.colorAttachmentCount = 1;
-            subpass.pColorAttachments = &colorAttachmentRef;
+            subpass.pColorAttachments = &colorAttachmentRef; // 指定对颜色附件的引用.子通道还可以引用以下其他类型的附件 pInputAttachments：从着色器读取附件；pResolveAttachments：用于多重采样颜色附件的附件； pDepthStencilAttachment：用于深度和模板数据的附件； pPreserveAttachments：此子通道未使用但必须保留数据的附件； 
 
             VkRenderPassCreateInfo renderPassInfo = {};
             renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
