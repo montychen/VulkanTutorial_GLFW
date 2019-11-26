@@ -98,10 +98,14 @@ class HelloTriangleApplication {
         VkFormat swapChainImageFormat;
         VkExtent2D swapChainExtent;
         std::vector<VkImageView> swapChainImageViews;
+        std::vector<VkFramebuffer> swapChainFramebuffers;
 
         VkRenderPass renderPass;
         VkPipelineLayout pipelineLayout;
         VkPipeline graphicsPipeline;
+
+        VkCommandPool commandPool;
+        std::vector<VkCommandBuffer> commandBuffers;
 
         void initWindow(){
             glfwInit();
@@ -123,16 +127,28 @@ class HelloTriangleApplication {
             createImageViews();
             createRenderPass();
             createGraphicsPipeline();
+            createFramebuffers();
+            createCommandPool();
+            createCommandBuffers(); // 为每个交换链图像分配和记录命令。
         }
 
         void mainLoop() {
             while (!glfwWindowShouldClose(window)) { //添加一个事件循环, 它循环检查事件（例如点击X按钮），直到窗口被用户关闭为止.
                 glfwPollEvents();
+                drawFrame();
             }
 
+            vkDeviceWaitIdle(device);
         }
 
         void cleanup() {
+            vkDestroyCommandPool(device, commandPool, nullptr);
+            
+            for (auto framebuffer : swapChainFramebuffers) {
+                vkDestroyFramebuffer(device, framebuffer, nullptr);
+            }
+
+            vkDestroyPipeline(device, graphicsPipeline, nullptr);
             vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
             vkDestroyRenderPass(device, renderPass, nullptr);
 
@@ -396,7 +412,7 @@ class HelloTriangleApplication {
             colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; //  在启动子通道时，Vulkan会自动将附件转换为此布局。我们打算将附件用作颜色缓冲区里VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 
             VkSubpassDescription subpass = {};
-            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS; // Vulkan可能在未来支持计算子通道，因此我们必须明确将其指定为图形子通道
+            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS; // Vulkan支持图形管道和计算管道，不仅用于图形渲染，还可用于计算，这里指定为图形管道VK_PIPELINE_BIND_POINT_GRAPHICS
             subpass.colorAttachmentCount = 1;
             subpass.pColorAttachments = &colorAttachmentRef; // 指定对颜色附件的引用.子通道还可以引用以下其他类型的附件 pInputAttachments：从着色器读取附件；pResolveAttachments：用于多重采样颜色附件的附件； pDepthStencilAttachment：用于深度和模板数据的附件； pPreserveAttachments：此子通道未使用但必须保留数据的附件； 
 
@@ -524,6 +540,166 @@ class HelloTriangleApplication {
             vkDestroyShaderModule(device, vertShaderModule, nullptr);
 
         }
+
+
+        void createFramebuffers() { // 从swapchain获得image之后，我们应该绘制它。为了绘制image，需要把这个image用VkImageView或者 VkFramebuffer进行包装。 Imageview指向被使用的image, 而framebuffer指向imageview，
+            swapChainFramebuffers.resize(swapChainImageViews.size()); // 一般swapchain里有多少image就需要创建对应数量的和imageview和framebuffer。 Render pass只是描述要使用的image类型，而framebuffer才是真正绑定该image对象。
+
+            for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+                VkImageView attachments[] = {  swapChainImageViews[i]  };
+
+                VkFramebufferCreateInfo framebufferInfo = {};
+                framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+                framebufferInfo.renderPass = renderPass;
+                framebufferInfo.attachmentCount = 1;
+                framebufferInfo.pAttachments = attachments;
+                framebufferInfo.width = swapChainExtent.width;
+                framebufferInfo.height = swapChainExtent.height;
+                framebufferInfo.layers = 1;
+
+                if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
+                    throw std::runtime_error("failed to create framebuffer!");
+                }
+            }
+        }
+
+
+
+        void createCommandPool() {
+            QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
+
+            VkCommandPoolCreateInfo poolInfo = {};
+            poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+            poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value(); // 绘图和显示是不同的队列。我们将记录绘图命令，所以这里选择图形队列簇。
+            // poolInfo.flags命令池有两种标志, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT：提示命令缓冲频繁的重新记录新命令。CREATE_RESET_COMMAND_BUFFER_BIT允许个别命令缓冲区单独重新记录，没有这个标志的话，所有的命令缓冲区都必须一起重置
+
+            if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
+                throw std::runtime_error("failed to create command pool!");
+            }
+        }
+
+        
+
+        void createCommandBuffers() { // 为每个交换链图像分配和记录命令。
+            commandBuffers.resize(swapChainFramebuffers.size());
+
+            VkCommandBufferAllocateInfo allocInfo = {};
+            allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            allocInfo.commandPool = commandPool; // VkCommandBuffer并不是直接创建的，它的构建非常昂贵， 它从VkCommandPool 中分配出来。
+            allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; // level参数指定是主命令缓冲区还是辅助命令缓冲区。 PRIMARY：主命令缓冲区，可以提交到队列执行，但不能从其他命令缓冲区调用。SECONDARY：辅助命令缓冲区，无法直接提交给队列执行，但可以从主命令缓冲区调用。 可以考虑在辅助缓冲区放一些重用的操作，然后从主缓冲区调用。
+            allocInfo.commandBufferCount = (uint32_t) commandBuffers.size();
+
+            if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) { // 分配命令缓冲区
+                throw std::runtime_error("failed to allocate command buffers!");
+            }
+
+            for (size_t i = 0; i < commandBuffers.size(); i++) {
+                VkCommandBufferBeginInfo beginInfo = {};
+                beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+                if (vkBeginCommandBuffer(commandBuffers[i], &beginInfo) != VK_SUCCESS) { // 调用vkBeginCommandBuffer开始记录命令缓冲区, 命令缓冲区的记录不能追加，对vkBeginCommandBuffer的再次调用将隐式重置：先清除之前的记录再写入。
+                    throw std::runtime_error("failed to begin recording command buffer!");
+                }
+
+                VkRenderPassBeginInfo renderPassInfo = {};
+                renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+                renderPassInfo.renderPass = renderPass;
+                renderPassInfo.framebuffer = swapChainFramebuffers[i];
+                renderPassInfo.renderArea.offset = {0, 0}; // 定义渲染区域的大小，渲染区域定义了着色器加载和存储的位置。
+                renderPassInfo.renderArea.extent = swapChainExtent;
+
+                VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f}; // 将清除颜色定义为仅具有100％不透明度的黑色。
+                renderPassInfo.clearValueCount = 1;
+                renderPassInfo.pClearValues = &clearColor;
+
+                vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE); // 调用vkCmdBeginRenderPass开启渲染通道。VK_SUBPASS_CONTENTS_INLINE：渲染命令嵌在主命令​​缓冲区中，并且不会执行辅助命令缓冲区；CONTENTS_SECONDARY_COMMAND_BUFFERS：渲染命令将从辅助命令缓冲区执行。
+
+                vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);  // Vulkan支持图形管道和计算管道，不仅用于图形渲染，还可用于计算，这里指定为图形管道VK_PIPELINE_BIND_POINT_GRAPHICS
+
+                vkCmdDraw(commandBuffers[i], 3, 1, 0, 0); // 3是顶点数量
+
+                vkCmdEndRenderPass(commandBuffers[i]); // 渲染过程现在结束
+
+                if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) { // 完成了命令缓冲区的录制
+                    throw std::runtime_error("failed to record command buffer!");
+                }
+            }
+        }
+
+
+        void createSyncObjects() {
+            imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+            renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+            inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+            imagesInFlight.resize(swapChainImages.size(), VK_NULL_HANDLE);
+
+            VkSemaphoreCreateInfo semaphoreInfo = {};
+            semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+            VkFenceCreateInfo fenceInfo = {};
+            fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+            fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+            for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+                if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+                    vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
+                    vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
+                    throw std::runtime_error("failed to create synchronization objects for a frame!");
+                }
+            }
+        }
+
+
+        void drawFrame() {
+            vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+
+            uint32_t imageIndex;
+            vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+            if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
+                vkWaitForFences(device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
+            }
+            imagesInFlight[imageIndex] = inFlightFences[currentFrame];
+
+            VkSubmitInfo submitInfo = {};
+            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+            VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
+            VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+            submitInfo.waitSemaphoreCount = 1;
+            submitInfo.pWaitSemaphores = waitSemaphores;
+            submitInfo.pWaitDstStageMask = waitStages;
+
+            submitInfo.commandBufferCount = 1;
+            submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
+
+            VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
+            submitInfo.signalSemaphoreCount = 1;
+            submitInfo.pSignalSemaphores = signalSemaphores;
+
+            vkResetFences(device, 1, &inFlightFences[currentFrame]);
+
+            if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
+                throw std::runtime_error("failed to submit draw command buffer!");
+            }
+
+            VkPresentInfoKHR presentInfo = {};
+            presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+            presentInfo.waitSemaphoreCount = 1;
+            presentInfo.pWaitSemaphores = signalSemaphores;
+
+            VkSwapchainKHR swapChains[] = {swapChain};
+            presentInfo.swapchainCount = 1;
+            presentInfo.pSwapchains = swapChains;
+
+            presentInfo.pImageIndices = &imageIndex;
+
+            vkQueuePresentKHR(presentQueue, &presentInfo);
+
+            currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+        }
+
 
         // 创建着色器模块：着色器代码要先封装在着色器模块中VkShaderModule， 才能传给图形管线
         VkShaderModule createShaderModule(const std::vector<char>& code) {

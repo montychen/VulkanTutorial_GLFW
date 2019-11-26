@@ -302,10 +302,6 @@ vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue
     #+end_src
 
 
-** VkFrameBuffer
-- Framebuffer 其实就是一堆VkImageView，framebuffer引用imageView ，把它当做color、depth和stencil的目标使用。因为swapchain里可以有多个image。framebuffer的创建个数需要跟swapchain里image的数量对应.
-
-
 ** 图像管线Graphics pipeline ->
 - 图形渲染管线可以被划分为两个主要部分：
   1、把你的3D坐标转换为2D坐标。
@@ -392,21 +388,15 @@ $VULKAN_SDK/bin/glslc shaser.frag -o frag.spv # 编译片段着色器
 - render layer 是把不同的物体放到不同的 layer 层里去渲染，比如前景放到一层，背景放到一层，所以每个层里渲染出来的图像包括的物体的所有信息。比如物体的高光，颜色，反光，阴影等等都在一个层里。
 - render pass: 把一个物体的所有信息，分开来进行渲染，比如颜色pass、高光passes、环境光遮挡等等其他passes。为什么我们要用不同的pass来渲染呢？在源头就将这些信息独立开来，这样在合成的时候我们就可以有更多的控制空间和选择余地了。
 
-- Render pass 描述了在渲染阶段要使用的 image 类型、如何使用以及如何处理 image 的内容。请注意，Render pass 只是描述要使用的 image 类型，而 framebuffer( 通过绑定 image )才是要使用的 image 实体。
+- Render pass 描述了在渲染阶段要使用的 image 类型、如何使用以及如何处理 image 的内容。请注意，Render pass 只是描述要使用的 image 类型，而 framebuffer才是真正绑定该image对象。
 - VkRenderPass 由多个子 pass 组成。在简单的场景一般只有一个子 pass。子 pass 选择一些 attachment 作为颜色目标，另外一些作为深度和模版目标。如果你有多个子 pass，每个子 pass 将有不同的集合，一些用于输入，一些用于输出。
 
-** 创建帧缓存，它引用渲染通道
-color attachment 为从 swap chain 获取的 image，depth/stencil attachment 为 depth buffer 的 image。
+** VkFrameBuffer
+- Framebuffer 其实就是一堆VkImageView，framebuffer引用imageView ，把它当做color、depth和stencil的目标使用。
+- 在从swapchain获得image之后，应该绘制它。为了绘制image，需要把这个image用VkImageView包装。 Imageview指向被使用的image , 而framebuffer指向imageview。Render pass只是描述要使用的image类型，而framebuffer才是真正绑定该image对象。
+- Swapchain中可能存在很多iamge，每个都需要创建imageview还有framebuffer, 一般swapchain里有多少image就需要创建对应数量的imageview和framebuffer。在渲染时，我们需要选择正确的image进行绘制。
 
-** 构建图形管线 Graphics pipeline
-#+ATTR_latex: :width 800   #+ATTR_HTML: :width 800  #+ATTR_ORG: :width 800
-[[file:vulkan_pipeline.png]]
-
-- Graphics Pipeline 通过创建 VkPipeline 对象来建立。它描述了一些显卡 *不可编程部分* 的可配置状态(configurable state )，比如 viewport 的大小和 depth buffer 操作等，以及用 *VkShaderModule 表示的可编程部分* 。VkShaderModule 对象用着色器的字节码来创建。驱动需要知道哪些渲染目标将在 pipeline 中使用，而这些目标就是我们在 Render pass 中定义的 image。
-
-- Vulkan 和现存的其他图形 API 最显著地区别就是：几乎所有不可编程部分的配置都要在 pipeline 创建前提前完成。这就意味着如果你想换一个着色器(shader)或者仅仅改变一些顶点的布局(vertex layout) ,那么你必须重新创建 pipeline 。这也意味着你必须提前创建很多 pipeline，来应对渲染过程中不同组合的配置。只有很少的一些配置你可以动态改变，比如 viewport 的大小和 celar 的颜色等。Pipeline 中所有的配置状态你必须显示的进行定义，比如，颜色混合就没有为你提供默认的配置。
-
-** 申请命令缓存，为交换链的每个 image 记录绘制命令
+** 申请CommandBuffer命令缓存，为交换链的每个 image 记录绘制命令
 - Vulkan中的命令要先记录到VkCommandBuffer中，然后才能提交到队列queue，由队列将这些作业提交给物理设备去执行。VkCommandBuffer并不是直接创建的，它的构建非常昂贵， 它从VkCommandPool 中分配出来。
 - 创建 *Command Buffer* 的三个重要元素分别为 VkDescriptorSet（纹理和常量）、VkPipeline（着色器和状态）和VkBuffer（顶点数组）
 
