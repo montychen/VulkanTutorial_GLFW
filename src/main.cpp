@@ -650,6 +650,7 @@ class HelloTriangleApplication {
         }
 
 
+        // 将三角形显示到屏幕，通过以下异步执行的操作来完成： 1、从交换链中获取image； 2、在framebuffer中将该图像作为附件执行command buffer中的命令； 3、将image返回到交换链准备显示
         void drawFrame() {
             vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
@@ -664,7 +665,7 @@ class HelloTriangleApplication {
             VkSubmitInfo submitInfo = {};
             submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-            VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
+            VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]}; // fences栅栏：用于应用程序和渲染操作间的同步。semaphore信号量：用于command queue命令队列间或跨命令队列间的同步。
             VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
             submitInfo.waitSemaphoreCount = 1;
             submitInfo.pWaitSemaphores = waitSemaphores;
